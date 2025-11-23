@@ -1,0 +1,5 @@
+{
+  "name": "QuantFlow Simulator",
+  "description": "A high-fidelity market simulator using Geometric Brownian Motion and real-time technical analysis visualization.",
+  "requestFramePermissions": []
+}
