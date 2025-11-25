@@ -4,7 +4,7 @@ import { MarketEngine } from './services/marketEngine';
 import { StreamingMACD, StreamingEMA } from './services/indicators';
 import { FinancialChart } from './components/FinancialChart';
 import { TradeDetailsModal } from './components/TradeDetailsModal';
-import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, ChartZone } from './types';
+import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot } from './types';
 
 // Icons
 const PlayIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
@@ -14,7 +14,6 @@ const EyeOffIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" heig
 const RefreshIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>;
 const PencilIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>;
 const ClipboardListIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect><path d="M9 14h.01"></path><path d="M9 10h.01"></path><path d="M9 18h.01"></path><path d="M13 14h4"></path><path d="M13 10h4"></path><path d="M13 18h4"></path></svg>;
-const SquareIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>;
 const DownloadIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>;
 
 const CANDLE_TIME_STEP = 60; // Fixed to 1 minute candles for the simulation
@@ -44,8 +43,19 @@ export default function App() {
   // --- State ---
   const [candles, setCandles] = useState<CandleData[]>([]);
   const [macdData, setMacdData] = useState<MacdData[]>([]);
-  const [emaData, setEmaData] = useState<{time: number, value: number}[]>([]);
   
+  // EMA 1
+  const [emaData, setEmaData] = useState<{time: number, value: number}[]>([]);
+  const [emaPeriod, setEmaPeriod] = useState(200);
+  const [emaColor, setEmaColor] = useState('#facc15'); // Default Yellow
+  const [isEma1Visible, setIsEma1Visible] = useState(true);
+  
+  // EMA 2
+  const [ema2Data, setEma2Data] = useState<{time: number, value: number}[]>([]);
+  const [ema2Period, setEma2Period] = useState(50);
+  const [ema2Color, setEma2Color] = useState('#06b6d4'); // Default Cyan
+  const [isEma2Visible, setIsEma2Visible] = useState(true);
+
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
@@ -54,40 +64,39 @@ export default function App() {
   const [isAutoMode, setIsAutoMode] = useState(false);
   const [isBlindMode, setIsBlindMode] = useState(false);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
-  const [isZoneMode, setIsZoneMode] = useState(false); // Mode for drawing rectangles
   const [currentSessionLabel, setCurrentSessionLabel] = useState("MANUAL");
   
   const [config, setConfig] = useState<MarketConfig>({
     volatility: 0.002, 
     drift: 0.0001, 
     tickSpeedMs: 200, 
-    startPrice: 1000,
+    startPrice: 1105, // Scaled (EUR/USD-like behavior)
   });
 
   // Analysis Settings
-  const [emaPeriod, setEmaPeriod] = useState(200);
-  const [emaColor, setEmaColor] = useState('#facc15'); // Default Yellow
   // Default MACD Settings updated to 35, 115, 18
   const [macdSettings, setMacdSettings] = useState({ fast: 35, slow: 115, signal: 18 });
+  const [isMacdVisible, setIsMacdVisible] = useState(true);
   
   const [priceLines, setPriceLines] = useState<number[]>([]);
-  const [chartZones, setChartZones] = useState<ChartZone[]>([]);
   const [pnl, setPnl] = useState(0);
 
   // Execution Settings
-  const [slPoints, setSlPoints] = useState<number>(10);
-  const [tpPoints, setTpPoints] = useState<number>(20);
+  const [slPoints, setSlPoints] = useState<number>(1); // 1 Point
+  const [tpPoints, setTpPoints] = useState<number>(2); // 2 Points
 
   // --- Refs for Simulation Engine ---
   const marketEngineRef = useRef<MarketEngine | null>(null);
   const macdEngineRef = useRef<StreamingMACD | null>(null);
   const emaEngineRef = useRef<StreamingEMA | null>(null);
+  const ema2EngineRef = useRef<StreamingEMA | null>(null);
   
   // State Refs for loop access
   const configRef = useRef(config);
   const candlesRef = useRef(candles); 
   const macdDataRef = useRef(macdData); // Needed for snapshot capture in hotkeys
   const emaDataRef = useRef(emaData);   // Needed for snapshot capture in hotkeys
+  const ema2DataRef = useRef(ema2Data); // Needed for snapshot capture in hotkeys
   const slPointsRef = useRef(slPoints);
   const tpPointsRef = useRef(tpPoints);
   
@@ -100,6 +109,7 @@ export default function App() {
   useEffect(() => { candlesRef.current = candles; }, [candles]);
   useEffect(() => { macdDataRef.current = macdData; }, [macdData]);
   useEffect(() => { emaDataRef.current = emaData; }, [emaData]);
+  useEffect(() => { ema2DataRef.current = ema2Data; }, [ema2Data]);
   useEffect(() => { slPointsRef.current = slPoints; }, [slPoints]);
   useEffect(() => { tpPointsRef.current = tpPoints; }, [tpPoints]);
 
@@ -110,15 +120,20 @@ export default function App() {
 
       // 1. Instantiate new engines with updated settings
       const newEmaEngine = new StreamingEMA(emaPeriod);
+      const newEma2Engine = new StreamingEMA(ema2Period);
       const newMacdEngine = new StreamingMACD(macdSettings.fast, macdSettings.slow, macdSettings.signal);
 
       // 2. Replay history
       const newEmaData: {time: number, value: number}[] = [];
+      const newEma2Data: {time: number, value: number}[] = [];
       const newMacdData: MacdData[] = [];
 
       currentCandles.forEach(c => {
           const emaVal = newEmaEngine.next(c.close);
           newEmaData.push({ time: c.time, value: emaVal });
+          
+          const ema2Val = newEma2Engine.next(c.close);
+          newEma2Data.push({ time: c.time, value: ema2Val });
 
           const macdVal = newMacdEngine.next(c.close);
           const prevHist = newMacdData.length > 0 ? newMacdData[newMacdData.length - 1].value : 0;
@@ -134,13 +149,15 @@ export default function App() {
 
       // 3. Update State with recalculated data
       setEmaData(newEmaData);
+      setEma2Data(newEma2Data);
       setMacdData(newMacdData);
 
       // 4. Update Refs so the next tick continues from this correct state
       emaEngineRef.current = newEmaEngine;
+      ema2EngineRef.current = newEma2Engine;
       macdEngineRef.current = newMacdEngine;
 
-  }, [emaPeriod, macdSettings]); 
+  }, [emaPeriod, ema2Period, macdSettings]); 
 
   // --- Helpers ---
   const getSpainTime = (timestamp: number) => {
@@ -162,80 +179,81 @@ export default function App() {
     return hour + (minute / 60);
   };
 
+  // --- MARKET PROFILE: EUR/USD DEFAULT ---
   const calculateSessionParameters = (timestamp: number) => {
     const timeVal = getMadridTimeDecimal(timestamp);
     const profile = dayProfileRef.current;
     const biasMagnitude = Math.abs(baseBiasRef.current); 
 
-    let label = "ASIA / PRE-MARKET";
-    let vol = 0.0005; 
+    let label = "ASIA SESSION";
+    let vol = 0.0003; // Low vol Asia
     let d = 0;
 
     const getMorningDrift = () => {
         if (profile === DayProfile.TREND_UP || profile === DayProfile.REVERSAL_DOWN) return biasMagnitude;
         if (profile === DayProfile.TREND_DOWN || profile === DayProfile.REVERSAL_UP) return -biasMagnitude;
-        return (Math.random() - 0.5) * 0.0002; 
+        return (Math.random() - 0.5) * 0.0001; 
     };
 
     const getAfternoonDrift = () => {
         if (profile === DayProfile.TREND_UP || profile === DayProfile.REVERSAL_UP) return biasMagnitude * 1.2;
         if (profile === DayProfile.TREND_DOWN || profile === DayProfile.REVERSAL_DOWN) return -biasMagnitude * 1.2;
-        return (Math.random() - 0.5) * 0.0002; 
+        return (Math.random() - 0.5) * 0.0001; 
     };
 
-    // --- TRADING DAY SCHEDULE (MADRID TIME) ---
+    // --- EUR/USD TRADING SCHEDULE (MADRID TIME) ---
+    
+    // 08:00 - 09:00: Frankfurt Open / Pre-London
     if (timeVal >= 8 && timeVal < 9) {
-        label = "🇪🇺 PRE-MARKET";
-        vol = 0.001; 
-        d = getMorningDrift() * 0.3;
+        label = "🇩🇪 FRANKFURT OPEN";
+        vol = 0.0015; 
+        d = getMorningDrift() * 0.5;
     }
-    else if (timeVal >= 9 && timeVal < 10) {
-        label = "🔔 EU OPEN";
-        vol = 0.0045; 
-        d = getMorningDrift() * 2.0; 
+    // 09:00 - 11:30: London Open / Core Session
+    else if (timeVal >= 9 && timeVal < 11.5) {
+        label = "🇬🇧 LONDON SESSION";
+        vol = 0.0035; 
+        d = getMorningDrift() * 1.5; 
     }
-    else if (timeVal >= 10 && timeVal < 12) {
-        label = "🇪🇺 MORNING";
-        vol = 0.0025;
-        d = getMorningDrift();
-    }
-    else if (timeVal >= 12 && timeVal < 14) {
+    // 11:30 - 13:30: Lunch Lull (Ranges common)
+    else if (timeVal >= 11.5 && timeVal < 13.5) {
         label = "🍽️ LUNCH LULL";
-        vol = 0.0008; 
-        d = 0; 
+        vol = 0.0010;
+        d = 0; // Mean reversion / choppy
     }
-    else if (timeVal >= 14 && timeVal < 14.5) {
-        label = "🇺🇸 PRE-GAME";
+    // 13:30 - 14:30: Pre-NY (Positioning)
+    else if (timeVal >= 13.5 && timeVal < 14.5) {
+        label = "🇺🇸 PRE-NY";
+        vol = 0.0020;
+        d = getAfternoonDrift() * 0.5;
+    }
+    // 14:30 - 15:30: US Macro Data (High Impact for EUR/USD)
+    else if (timeVal >= 14.5 && timeVal < 15.5) {
+        label = "📊 US MACRO DATA";
+        vol = 0.0060; // Spikes
+        d = (Math.random() > 0.5 ? 1 : -1) * biasMagnitude * 2.0; 
+    }
+    // 15:30 - 17:00: London/NY Overlap (Max Liquidity)
+    else if (timeVal >= 15.5 && timeVal < 17) {
+        label = "⚡ LDN/NY OVERLAP";
+        vol = 0.0050; 
+        d = getAfternoonDrift() * 1.8; 
+    }
+    // 17:00 - 17:30: London Fix (Reversals/Acceleration)
+    else if (timeVal >= 17 && timeVal < 17.5) {
+        label = "🇬🇧 LONDON FIX";
+        vol = 0.0040;
+        d = getAfternoonDrift() * 1.2;
+    }
+    // 17:30 - 22:00: NY Afternoon
+    else if (timeVal >= 17.5 && timeVal < 22) {
+        label = "🇺🇸 NY AFTERNOON";
         vol = 0.0015;
         d = getAfternoonDrift() * 0.5;
     }
-    else if (timeVal >= 14.5 && timeVal < 15.5) {
-        label = "📊 US DATA / POS";
-        vol = 0.0035;
-        d = (Math.random() > 0.5 ? 1 : -1) * biasMagnitude * 1.5; 
-    }
-    else if (timeVal >= 15.5 && timeVal < 16.5) {
-        label = "🔔🇺🇸 US OPEN";
-        vol = 0.007; 
-        d = getAfternoonDrift() * 2.5; 
-    }
-    else if (timeVal >= 16.5 && timeVal < 17.5) {
-        label = "⚡ OVERLAP";
-        vol = 0.004;
-        d = getAfternoonDrift() * 1.5;
-    }
-    else if (timeVal >= 17.5 && timeVal < 18) {
-        label = "🏁 EU CLOSE";
-        vol = 0.005;
-        d = -getAfternoonDrift() * 0.5; 
-    }
-    else if (timeVal >= 18 && timeVal < 22) {
-        label = "🇺🇸 AFTERNOON";
-        vol = 0.002;
-        d = getAfternoonDrift() * 0.6;
-    }
+    // 22:00+: Asia/Closed
     else {
-        label = "MARKET CLOSED";
+        label = "ASIA / ROLLOVER";
         vol = 0.0002;
         d = 0;
     }
@@ -251,20 +269,21 @@ export default function App() {
     marketEngineRef.current = new MarketEngine(config.startPrice, startTs);
     macdEngineRef.current = new StreamingMACD(macdSettings.fast, macdSettings.slow, macdSettings.signal);
     emaEngineRef.current = new StreamingEMA(emaPeriod);
+    ema2EngineRef.current = new StreamingEMA(ema2Period);
     
     const rand = Math.random();
     let profile = DayProfile.CHOPPY;
-    let bias = 0.00015; 
+    let bias = 0.00010; 
 
     if (rand < 0.3) {
         profile = Math.random() > 0.5 ? DayProfile.TREND_UP : DayProfile.TREND_DOWN;
-        bias = 0.0003; 
+        bias = 0.00020; 
     } else if (rand < 0.6) {
         profile = Math.random() > 0.5 ? DayProfile.REVERSAL_UP : DayProfile.REVERSAL_DOWN;
-        bias = 0.00025;
+        bias = 0.00015;
     } else {
         profile = DayProfile.CHOPPY;
-        bias = 0.0001;
+        bias = 0.00005;
     }
     
     dayProfileRef.current = profile;
@@ -273,22 +292,24 @@ export default function App() {
     setCandles([]);
     setMacdData([]);
     setEmaData([]);
+    setEma2Data([]);
     setTrades([]);
     setPriceLines([]);
-    setChartZones([]); // Reset Zones
     setIsPlaying(false);
     setCurrentSessionLabel("RESET");
-    setConfig(prev => ({ ...prev, volatility: 0.002, drift: 0.0001 }));
+    setConfig(prev => ({ ...prev, volatility: 0.0015, drift: 0.0000 }));
   };
 
   // --- Snapshot Logic ---
   const captureSnapshot = (
-      cEmaData: {value: number}[], 
+      cEmaData: {value: number}[],
+      cEma2Data: {value: number}[],
       cMacdData: MacdData[]
   ): TradeSnapshot | undefined => {
       if (cEmaData.length === 0 || cMacdData.length === 0) return undefined;
 
       const currentEma = cEmaData[cEmaData.length - 1].value;
+      const currentEma2 = cEma2Data.length > 0 ? cEma2Data[cEma2Data.length - 1].value : 0;
       const currentMacd = cMacdData[cMacdData.length - 1];
       // Get previous MACD histogram to determine trend, default to 0 if not available
       const prevHist = cMacdData.length > 1 ? cMacdData[cMacdData.length - 2].value : 0;
@@ -305,6 +326,7 @@ export default function App() {
 
       return {
           ema: currentEma,
+          ema2: currentEma2,
           macd: {
               macd: currentMacd.macd,
               signal: currentMacd.signal,
@@ -325,7 +347,7 @@ export default function App() {
 
     if (isPlaying) {
       intervalId = setInterval(() => {
-        if (!marketEngineRef.current || !macdEngineRef.current || !emaEngineRef.current) return;
+        if (!marketEngineRef.current || !macdEngineRef.current || !emaEngineRef.current || !ema2EngineRef.current) return;
 
         let currentVol = configRef.current.volatility;
         let currentDrift = configRef.current.drift;
@@ -351,6 +373,7 @@ export default function App() {
         const newCandle = marketEngineRef.current.nextTick(currentDrift, currentVol, CANDLE_TIME_STEP);
         const newMacd = macdEngineRef.current.next(newCandle.close);
         const newEmaVal = emaEngineRef.current.next(newCandle.close);
+        const newEma2Val = ema2EngineRef.current.next(newCandle.close);
 
         setCandles(prev => {
             const next = [...prev, newCandle];
@@ -373,6 +396,12 @@ export default function App() {
 
         setEmaData(prev => {
             const next = [...prev, { time: newCandle.time, value: newEmaVal }];
+            if (next.length > 300) next.shift();
+            return next;
+        });
+
+        setEma2Data(prev => {
+            const next = [...prev, { time: newCandle.time, value: newEma2Val }];
             if (next.length > 300) next.shift();
             return next;
         });
@@ -475,8 +504,6 @@ export default function App() {
       }
 
       if (key === 'd') {
-          // If Zone mode is on, turn it off first
-          if (isZoneMode) setIsZoneMode(false);
           setIsDrawingMode(prev => !prev);
           return;
       }
@@ -502,7 +529,7 @@ export default function App() {
             ? (type === TradeType.LONG ? currentPrice + tp : currentPrice - tp)
             : undefined;
 
-      const snapshot = captureSnapshot(emaDataRef.current, macdDataRef.current);
+      const snapshot = captureSnapshot(emaDataRef.current, ema2DataRef.current, macdDataRef.current);
 
       const newTrade: Trade = {
             id: Math.random().toString(36).substr(2, 9),
@@ -521,7 +548,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isZoneMode]); 
+  }, []); 
 
   // --- Handlers ---
   const handleTrade = (type: TradeType) => {
@@ -536,7 +563,7 @@ export default function App() {
         ? (type === TradeType.LONG ? currentPrice + tpPoints : currentPrice - tpPoints)
         : undefined;
 
-    const snapshot = captureSnapshot(emaData, macdData);
+    const snapshot = captureSnapshot(emaData, ema2Data, macdData);
 
     const newTrade: Trade = {
         id: Math.random().toString(36).substr(2, 9),
@@ -579,27 +606,12 @@ export default function App() {
       setIsDrawingMode(false);
   };
   
-  const handleZoneComplete = (zone: ChartZone) => {
-      setChartZones(prev => [...prev, zone]);
-      setIsZoneMode(false);
-  };
-
   const removeLine = (index: number) => {
       setPriceLines(prev => prev.filter((_, i) => i !== index));
   };
   
-  const removeZone = (id: string) => {
-      setChartZones(prev => prev.filter(z => z.id !== id));
-  };
-
   const toggleDrawingMode = () => {
-      setIsZoneMode(false);
       setIsDrawingMode(!isDrawingMode);
-  };
-
-  const toggleZoneMode = () => {
-      setIsDrawingMode(false);
-      setIsZoneMode(!isZoneMode);
   };
 
   const downloadCSV = () => {
@@ -608,7 +620,7 @@ export default function App() {
     const headers = [
       "ID", "Type", "Status", "Entry Price", "Exit Price", "PnL", 
       "Entry Time", "Exit Time", "Exit Reason", 
-      "EMA (Entry)", "MACD Value", "Signal Value", "Histogram", "Momentum Trend"
+      "EMA 1 (Entry)", "EMA 2 (Entry)", "MACD Value", "Signal Value", "Histogram", "Momentum Trend"
     ].join(",");
 
     const rows = trades.map(trade => {
@@ -616,7 +628,8 @@ export default function App() {
       const exitTimeStr = trade.closeTime ? new Date(trade.closeTime * 1000).toISOString() : "";
       
       const snap = trade.snapshot;
-      const ema = snap ? snap.ema.toFixed(3) : "";
+      const ema = snap ? snap.ema.toFixed(2) : "";
+      const ema2 = snap ? snap.ema2.toFixed(2) : "";
       const macd = snap ? snap.macd.macd.toFixed(3) : "";
       const signal = snap ? snap.macd.signal.toFixed(3) : "";
       const hist = snap ? snap.macd.histogram.toFixed(3) : "";
@@ -633,6 +646,7 @@ export default function App() {
         exitTimeStr,
         trade.exitReason || "",
         ema,
+        ema2,
         macd,
         signal,
         hist,
@@ -808,10 +822,15 @@ export default function App() {
              <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 shadow-lg">
                 <h2 className="text-xs font-semibold text-slate-400 uppercase mb-4 tracking-wider">Analysis Tools</h2>
                 
-                {/* EMA Control */}
-                <div className="space-y-3 mb-4">
+                {/* EMA 1 Control */}
+                <div className="space-y-2 mb-4">
                      <div className="flex justify-between items-center">
-                        <label className="text-xs text-slate-500">EMA Period</label>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setIsEma1Visible(!isEma1Visible)} className="text-slate-500 hover:text-white transition-colors">
+                                {isEma1Visible ? <EyeIcon /> : <EyeOffIcon />}
+                            </button>
+                            <label className="text-xs text-slate-500">EMA 1 Period</label>
+                        </div>
                         <div className="flex items-center gap-2">
                             <input 
                                 type="color" 
@@ -839,9 +858,50 @@ export default function App() {
                     />
                 </div>
 
+                {/* EMA 2 Control */}
+                <div className="space-y-2 mb-4">
+                     <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setIsEma2Visible(!isEma2Visible)} className="text-slate-500 hover:text-white transition-colors">
+                                {isEma2Visible ? <EyeIcon /> : <EyeOffIcon />}
+                            </button>
+                            <label className="text-xs text-slate-500">EMA 2 Period</label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="color" 
+                                value={ema2Color} 
+                                onChange={(e) => setEma2Color(e.target.value)}
+                                className="w-4 h-4 rounded cursor-pointer border-none p-0 bg-transparent"
+                                title="EMA 2 Color"
+                            />
+                            <input
+                                type="number"
+                                min="1"
+                                value={ema2Period}
+                                onChange={(e) => setEma2Period(parseInt(e.target.value) || 1)}
+                                className="bg-transparent text-right font-mono text-xs w-10 border-b border-transparent focus:border-indigo-500 focus:bg-slate-900/50 outline-none transition-all p-0"
+                                style={{color: ema2Color}}
+                            />
+                        </div>
+                     </div>
+                    <input 
+                        type="range" min="5" max="200" step="5"
+                        value={ema2Period}
+                        onChange={(e) => setEma2Period(parseInt(e.target.value))}
+                        className="w-full accent-cyan-500 bg-slate-700 h-1 rounded appearance-none cursor-pointer"
+                        style={{accentColor: ema2Color}}
+                    />
+                </div>
+
                 {/* MACD Settings */}
                 <div className="space-y-2 mb-4 border-t border-slate-700 pt-4">
-                    <label className="text-xs text-slate-500 block mb-2">MACD ({macdSettings.fast}, {macdSettings.slow}, {macdSettings.signal})</label>
+                    <div className="flex items-center gap-2 mb-2">
+                        <button onClick={() => setIsMacdVisible(!isMacdVisible)} className="text-slate-500 hover:text-white transition-colors">
+                            {isMacdVisible ? <EyeIcon /> : <EyeOffIcon />}
+                        </button>
+                        <label className="text-xs text-slate-500 block">MACD ({macdSettings.fast}, {macdSettings.slow}, {macdSettings.signal})</label>
+                    </div>
                     <div className="grid grid-cols-3 gap-2">
                         <div>
                             <span className="text-[10px] text-slate-500 block">Fast</span>
@@ -882,37 +942,20 @@ export default function App() {
                     >
                         <PencilIcon /> {isDrawingMode ? 'ACTIVE' : 'DRAW'}
                     </button>
-                    <button 
-                        onClick={toggleZoneMode}
-                        className={`flex-1 flex items-center justify-center gap-1 py-2 border rounded-lg text-xs transition-colors ${isZoneMode ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400 animate-pulse' : 'border-slate-600 text-slate-300 hover:bg-slate-700'}`}
-                        title="Draw Zones (Rectangles)"
-                    >
-                        <SquareIcon /> {isZoneMode ? 'ACTIVE' : 'ZONE'}
-                    </button>
                 </div>
 
-                {/* Active Levels & Zones List */}
-                {(priceLines.length > 0 || chartZones.length > 0) && (
+                {/* Active Levels List */}
+                {priceLines.length > 0 && (
                      <div className="mt-3 border-t border-slate-700 pt-3">
                         {priceLines.length > 0 && (
                             <div className="flex flex-wrap gap-2 mb-2">
                                 {priceLines.map((price, idx) => (
                                     <div key={idx} className="flex items-center gap-1 text-[10px] bg-slate-700 px-2 py-1 rounded border border-slate-600">
-                                        <span className="text-pink-400 font-mono">{price.toFixed(1)}</span>
+                                        <span className="text-pink-400 font-mono">{price.toFixed(2)}</span>
                                         <button onClick={() => removeLine(idx)} className="text-slate-400 hover:text-white">×</button>
                                     </div>
                                 ))}
                             </div>
-                        )}
-                        {chartZones.length > 0 && (
-                             <div className="flex flex-col gap-1">
-                                {chartZones.map((zone) => (
-                                    <div key={zone.id} className="flex items-center justify-between text-[10px] bg-slate-700 px-2 py-1 rounded border border-slate-600">
-                                        <span className="text-emerald-400 font-mono">ZONE: {zone.startPrice.toFixed(1)} - {zone.endPrice.toFixed(1)}</span>
-                                        <button onClick={() => removeZone(zone.id)} className="text-slate-400 hover:text-white ml-2">×</button>
-                                    </div>
-                                ))}
-                             </div>
                         )}
                      </div>
                 )}
@@ -928,9 +971,9 @@ export default function App() {
                         <label className="text-[10px] text-slate-500 block mb-1">Stop Loss (pts)</label>
                         <div className="relative">
                             <input 
-                                type="number" min="0"
+                                type="number" min="0" step="0.1"
                                 value={slPoints}
-                                onChange={(e) => setSlPoints(parseInt(e.target.value) || 0)}
+                                onChange={(e) => setSlPoints(parseFloat(e.target.value) || 0)}
                                 className="w-full bg-slate-900/50 text-sm px-2 py-1.5 rounded border border-red-900/50 focus:border-red-500 outline-none text-red-300"
                             />
                             <span className="absolute right-2 top-1.5 text-[10px] text-slate-600">pts</span>
@@ -940,9 +983,9 @@ export default function App() {
                         <label className="text-[10px] text-slate-500 block mb-1">Take Profit (pts)</label>
                         <div className="relative">
                             <input 
-                                type="number" min="0"
+                                type="number" min="0" step="0.1"
                                 value={tpPoints}
-                                onChange={(e) => setTpPoints(parseInt(e.target.value) || 0)}
+                                onChange={(e) => setTpPoints(parseFloat(e.target.value) || 0)}
                                 className="w-full bg-slate-900/50 text-sm px-2 py-1.5 rounded border border-emerald-900/50 focus:border-emerald-500 outline-none text-emerald-300"
                             />
                             <span className="absolute right-2 top-1.5 text-[10px] text-slate-600">pts</span>
@@ -1007,12 +1050,12 @@ export default function App() {
                                         <td className={`py-2 ${trade.type === TradeType.LONG ? 'text-emerald-400' : 'text-red-400'}`}>
                                             <div className="flex flex-col">
                                                 <span>{trade.type.substring(0,1)}</span>
-                                                {trade.stopLoss && <span className="text-[8px] text-slate-600">SL:{trade.stopLoss.toFixed(0)}</span>}
+                                                {trade.stopLoss && <span className="text-[8px] text-slate-600">SL:{trade.stopLoss.toFixed(2)}</span>}
                                             </div>
                                         </td>
                                         <td className="py-2 text-slate-300 align-top">
-                                            {trade.entryPrice.toFixed(1)}
-                                            {trade.takeProfit && <div className="text-[8px] text-slate-600">TP:{trade.takeProfit.toFixed(0)}</div>}
+                                            {trade.entryPrice.toFixed(2)}
+                                            {trade.takeProfit && <div className="text-[8px] text-slate-600">TP:{trade.takeProfit.toFixed(2)}</div>}
                                         </td>
                                         <td className={`py-2 text-right font-bold align-top ${livePnl! >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
                                             {livePnl!.toFixed(2)}
@@ -1064,15 +1107,16 @@ export default function App() {
                 macdData={macdData} 
                 currentPrice={currentPrice}
                 priceLines={priceLines}
-                chartZones={chartZones}
                 emaData={emaData}
+                ema2Data={ema2Data}
                 isDrawingMode={isDrawingMode}
-                isZoneMode={isZoneMode}
                 macdConfig={macdSettings}
                 emaColor={emaColor}
+                ema2Color={ema2Color}
+                isEma1Visible={isEma1Visible}
+                isEma2Visible={isEma2Visible}
+                isMacdVisible={isMacdVisible}
                 onChartClick={handleChartClick}
-                onZoneComplete={handleZoneComplete}
-                onRemoveZone={removeZone}
             />
             
             {/* Overlay Stats */}

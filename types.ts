@@ -1,4 +1,5 @@
 
+
 export enum TradeType {
   LONG = 'LONG',
   SHORT = 'SHORT',
@@ -21,7 +22,8 @@ export interface MacdData {
 }
 
 export interface TradeSnapshot {
-  ema: number;
+  ema: number; // EMA 1
+  ema2: number; // EMA 2
   macd: {
     macd: number;
     signal: number;
@@ -50,13 +52,4 @@ export interface MarketConfig {
   drift: number;
   tickSpeedMs: number;
   startPrice: number;
-}
-
-export interface ChartZone {
-  id: string;
-  startPrice: number;
-  startTime: number;
-  endPrice: number;
-  endTime: number;
-  color: string;
 }

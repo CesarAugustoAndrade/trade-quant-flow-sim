@@ -1,37 +1,39 @@
 
-import React, { useEffect, useRef, useState } from 'react';
-import { CandleData, MacdData, ChartZone } from '../types';
+import React, { useEffect, useRef } from 'react';
+import { CandleData, MacdData } from '../types';
 
 interface FinancialChartProps {
   candles: CandleData[];
   macdData: MacdData[];
   priceLines: number[];
-  chartZones: ChartZone[];
   currentPrice: number;
   emaData: { time: number; value: number }[];
+  ema2Data: { time: number; value: number }[];
   isDrawingMode: boolean;
-  isZoneMode: boolean;
+  isEma1Visible: boolean;
+  isEma2Visible: boolean;
+  isMacdVisible: boolean;
   macdConfig?: { fast: number; slow: number; signal: number };
   emaColor?: string;
+  ema2Color?: string;
   onChartClick: (price: number) => void;
-  onZoneComplete: (zone: ChartZone) => void;
-  onRemoveZone: (id: string) => void;
 }
 
 export const FinancialChart: React.FC<FinancialChartProps> = ({ 
   candles, 
   macdData, 
   priceLines,
-  chartZones,
   currentPrice,
   emaData,
+  ema2Data,
   isDrawingMode,
-  isZoneMode,
+  isEma1Visible,
+  isEma2Visible,
+  isMacdVisible,
   macdConfig = { fast: 35, slow: 115, signal: 18 },
   emaColor = '#facc15', // Default yellow
+  ema2Color = '#06b6d4', // Default Cyan
   onChartClick,
-  onZoneComplete,
-  onRemoveZone
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const mainChartContainerRef = useRef<HTMLDivElement>(null);
@@ -43,22 +45,14 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
   
   // Series Refs
   const candleSeriesRef = useRef<any>(null);
-  const emaSeriesRef = useRef<any>(null); // EMA
+  const emaSeriesRef = useRef<any>(null); // EMA 1
+  const ema2SeriesRef = useRef<any>(null); // EMA 2
   const histogramSeriesRef = useRef<any>(null);
   const macdLineSeriesRef = useRef<any>(null);
   const signalLineSeriesRef = useRef<any>(null);
   
   // Object Refs for Drawing
   const priceLinesRef = useRef<Map<number, any>>(new Map());
-  
-  // Dragging State Refs (Using refs to avoid re-renders during 60fps drag)
-  const isDraggingZone = useRef(false);
-  const dragStart = useRef<{price: number, time: number} | null>(null);
-  const tempZoneEnd = useRef<{price: number, time: number} | null>(null);
-
-  // Overlay State for Zones
-  const [renderedZones, setRenderedZones] = useState<any[]>([]);
-  const [tempZoneStyle, setTempZoneStyle] = useState<any>(null);
 
   // Initialization Effect
   useEffect(() => {
@@ -117,12 +111,22 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
       wickDownColor: '#ef4444',
     });
 
-    // EMA Series
+    // EMA Series 1
     const emaSeries = mainChart.addSeries(LineSeries, {
       color: emaColor, 
       lineWidth: 2,
       crosshairMarkerVisible: false,
       priceLineVisible: false,
+      visible: isEma1Visible,
+    });
+
+    // EMA Series 2
+    const ema2Series = mainChart.addSeries(LineSeries, {
+      color: ema2Color, 
+      lineWidth: 2,
+      crosshairMarkerVisible: false,
+      priceLineVisible: false,
+      visible: isEma2Visible,
     });
 
     // --- Indicator Chart (MACD) ---
@@ -136,18 +140,21 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
     const histogramSeries = indicatorChart.addSeries(HistogramSeries, {
       color: '#26a69a',
       priceFormat: { type: 'volume' },
+      visible: isMacdVisible,
     });
     
     // MACD Line
     const macdLineSeries = indicatorChart.addSeries(LineSeries, {
       color: '#3b82f6', // Blue
       lineWidth: 1,
+      visible: isMacdVisible,
     });
 
     // Signal Line
     const signalLineSeries = indicatorChart.addSeries(LineSeries, {
       color: '#f59e0b', // Orange
       lineWidth: 1,
+      visible: isMacdVisible,
     });
 
     // --- Synchronization Logic ---
@@ -188,6 +195,7 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
     indicatorChartRef.current = indicatorChart;
     candleSeriesRef.current = candleSeries;
     emaSeriesRef.current = emaSeries;
+    ema2SeriesRef.current = ema2Series;
     histogramSeriesRef.current = histogramSeries;
     macdLineSeriesRef.current = macdLineSeries;
     signalLineSeriesRef.current = signalLineSeries;
@@ -214,85 +222,6 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
     };
   }, []);
 
-
-  // --- Zone Overlay Calculation Logic ---
-  // We need to listen to chart updates to recalculate the positions of the HTML overlays
-  const updateZonePositions = () => {
-      if (!mainChartRef.current || !candleSeriesRef.current) return;
-      
-      const chart = mainChartRef.current;
-      const series = candleSeriesRef.current;
-      const timeScale = chart.timeScale();
-
-      // Helper to calculate style for a zone
-      const getZoneStyle = (zStartPrice: number, zStartTime: number, zEndPrice: number, zEndTime: number) => {
-          const y1 = series.priceToCoordinate(zStartPrice);
-          const y2 = series.priceToCoordinate(zEndPrice);
-          const x1 = timeScale.timeToCoordinate(zStartTime);
-          const x2 = timeScale.timeToCoordinate(zEndTime);
-
-          // If any coordinate is null, the point is off-screen or invalid
-          if (y1 === null || y2 === null) return null;
-
-          // x1/x2 might be null if far off screen, but let's handle graceful degradation
-          // If x1 is null but x2 is valid, start is off-screen left, etc.
-          // However, timeToCoordinate usually returns null only if strictly invalid, 
-          // let's assume we might need logic for off-screen. 
-          // For simplicity in this demo, if null we hide, or we could clamp.
-          
-          const validX1 = x1 !== null ? x1 : (zStartTime < timeScale.getVisibleLogicalRange()?.from ? -1000 : 10000); 
-          const validX2 = x2 !== null ? x2 : (zEndTime < timeScale.getVisibleLogicalRange()?.from ? -1000 : 10000);
-
-          const top = Math.min(y1, y2);
-          const height = Math.abs(y1 - y2);
-          const left = Math.min(validX1, validX2);
-          const width = Math.abs(validX1 - validX2);
-
-          return { top, left, width, height };
-      };
-
-      // 1. Rendered Zones
-      const updatedZones = chartZones.map(z => {
-          const style = getZoneStyle(z.startPrice, z.startPrice, z.endPrice, z.endTime); // Error in logic here? No.
-          // Wait, ChartZone has startTime/endTime.
-          const s = getZoneStyle(z.startPrice, z.startTime, z.endPrice, z.endTime);
-          return { ...z, style: s };
-      });
-      setRenderedZones(updatedZones);
-
-      // 2. Temp Drawing Zone
-      if (isDraggingZone.current && dragStart.current && tempZoneEnd.current) {
-          const s = getZoneStyle(
-              dragStart.current.price, 
-              dragStart.current.time, 
-              tempZoneEnd.current.price, 
-              tempZoneEnd.current.time
-          );
-          setTempZoneStyle(s);
-      } else {
-          setTempZoneStyle(null);
-      }
-  };
-
-  // Subscribe to chart updates for overlay syncing
-  useEffect(() => {
-      if (!mainChartRef.current) return;
-      
-      const chart = mainChartRef.current;
-      const handleUpdate = () => {
-          requestAnimationFrame(updateZonePositions);
-      };
-
-      chart.timeScale().subscribeVisibleLogicalRangeChange(handleUpdate);
-      chart.subscribeCrosshairMove(handleUpdate); // For smoother dragging updates
-
-      return () => {
-          chart.timeScale().unsubscribeVisibleLogicalRangeChange(handleUpdate);
-          chart.unsubscribeCrosshairMove(handleUpdate);
-      };
-  }, [chartZones]); // Re-bind when zones change to ensure they are captured in closure
-
-
   // --- Mouse Event Handlers for Custom Interaction ---
   const handleMouseDown = (e: React.MouseEvent) => {
       // 1. Handle Drawing Mode (Click to place line)
@@ -307,95 +236,39 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
           }
           return;
       }
-
-      // 2. Handle Zone Mode (Drag start)
-      if (isZoneMode && candleSeriesRef.current && mainChartRef.current && mainChartContainerRef.current) {
-           const rect = mainChartContainerRef.current.getBoundingClientRect();
-           const x = e.clientX - rect.left;
-           const y = e.clientY - rect.top;
-           
-           const price = candleSeriesRef.current.coordinateToPrice(y);
-           const time = mainChartRef.current.timeScale().coordinateToTime(x);
-           
-           if (price !== null && time !== null) {
-               isDraggingZone.current = true;
-               dragStart.current = { price, time };
-               tempZoneEnd.current = { price, time }; // Initialize end same as start
-               
-               // Disable chart scrolling while dragging
-               mainChartRef.current.applyOptions({
-                   handleScroll: { mouseWheel: false, pressedMouseMove: false },
-                   handleScale: { axisPressedMouseMove: false }
-               });
-           }
-      }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-      if (isDraggingZone.current && dragStart.current && candleSeriesRef.current && mainChartRef.current) {
-          const rect = mainChartContainerRef.current?.getBoundingClientRect();
-          if (!rect) return;
-          
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-
-          const currentPrice = candleSeriesRef.current.coordinateToPrice(y);
-          const currentTime = mainChartRef.current.timeScale().coordinateToTime(x);
-          
-          if (currentPrice !== null && currentTime !== null) {
-              tempZoneEnd.current = { price: currentPrice, time: currentTime };
-              // We rely on subscribeCrosshairMove to trigger the render update via updateZonePositions
-          }
-      }
-  };
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-      if (isDraggingZone.current && dragStart.current && tempZoneEnd.current) {
-           // Commit Zone
-           // Ensure valid dimensions (not 0 width/height)
-           if (Math.abs(dragStart.current.price - tempZoneEnd.current.price) > 0) {
-               onZoneComplete({
-                   id: Math.random().toString(36).substr(2, 9),
-                   startPrice: dragStart.current.price,
-                   startTime: dragStart.current.time as number,
-                   endPrice: tempZoneEnd.current.price,
-                   endTime: tempZoneEnd.current.time as number,
-                   color: 'rgba(34, 197, 94, 0.2)' // Default Green
-               });
-           }
-
-           // Cleanup
-           isDraggingZone.current = false;
-           dragStart.current = null;
-           tempZoneEnd.current = null;
-           setTempZoneStyle(null);
-
-           // Re-enable chart scrolling
-           mainChartRef.current.applyOptions({
-                handleScroll: { mouseWheel: true, pressedMouseMove: true },
-                handleScale: { axisPressedMouseMove: true }
-           });
-      }
   };
 
 
   // --- Effects ---
 
-  // Update Dynamic EMA Color
+  // Update Dynamic EMA Colors
   useEffect(() => {
     if (emaSeriesRef.current) {
       emaSeriesRef.current.applyOptions({ color: emaColor });
     }
-  }, [emaColor]);
+    if (ema2SeriesRef.current) {
+      ema2SeriesRef.current.applyOptions({ color: ema2Color });
+    }
+  }, [emaColor, ema2Color]);
+
+  // Update Visibility
+  useEffect(() => {
+    if (emaSeriesRef.current) emaSeriesRef.current.applyOptions({ visible: isEma1Visible });
+    if (ema2SeriesRef.current) ema2SeriesRef.current.applyOptions({ visible: isEma2Visible });
+    
+    if (histogramSeriesRef.current) histogramSeriesRef.current.applyOptions({ visible: isMacdVisible });
+    if (macdLineSeriesRef.current) macdLineSeriesRef.current.applyOptions({ visible: isMacdVisible });
+    if (signalLineSeriesRef.current) signalLineSeriesRef.current.applyOptions({ visible: isMacdVisible });
+  }, [isEma1Visible, isEma2Visible, isMacdVisible]);
 
   // Update Cursor Styles based on mode
   useEffect(() => {
       if(!mainChartRef.current || !mainChartContainerRef.current) return;
       
-      const cursor = (isDrawingMode || isZoneMode) ? 'crosshair' : 'default';
+      const cursor = isDrawingMode ? 'crosshair' : 'default';
       mainChartContainerRef.current.style.cursor = cursor;
       
-      const crosshairMode = (isDrawingMode || isZoneMode) 
+      const crosshairMode = isDrawingMode
           // @ts-ignore
           ? window.LightweightCharts.CrosshairMode.Magnet 
           // @ts-ignore
@@ -403,15 +276,16 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
 
       mainChartRef.current.applyOptions({ crosshair: { mode: crosshairMode } });
 
-  }, [isDrawingMode, isZoneMode]);
+  }, [isDrawingMode]);
 
 
   // Data Update Effect
   useEffect(() => {
-    if (!candleSeriesRef.current || !histogramSeriesRef.current || !emaSeriesRef.current) return;
+    if (!candleSeriesRef.current || !histogramSeriesRef.current || !emaSeriesRef.current || !ema2SeriesRef.current) return;
 
     candleSeriesRef.current.setData(candles);
     emaSeriesRef.current.setData(emaData);
+    ema2SeriesRef.current.setData(ema2Data);
 
     // Map MACD data
     const histData = macdData.map(d => ({ 
@@ -426,10 +300,7 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
     macdLineSeriesRef.current.setData(macdLineData);
     signalLineSeriesRef.current.setData(signalLineData);
 
-    // Force zone update when data changes (shifting timeline)
-    requestAnimationFrame(updateZonePositions);
-
-  }, [candles, macdData, emaData]);
+  }, [candles, macdData, emaData, ema2Data]);
 
   // Price Lines Effect (Horizontal Levels)
   useEffect(() => {
@@ -463,44 +334,8 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
       <div 
         className="relative flex-1 border-b border-slate-700 group"
         onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp} // Cancel drag if leaving
       >
         <div ref={mainChartContainerRef} className="w-full h-full relative z-0" />
-        
-        {/* HTML Overlay for Zones */}
-        <div className="absolute inset-0 pointer-events-none z-10 overflow-hidden">
-            {renderedZones.map((z) => (
-                z.style && (
-                    <div 
-                        key={z.id}
-                        style={{
-                            position: 'absolute',
-                            top: z.style.top,
-                            left: z.style.left,
-                            width: z.style.width,
-                            height: z.style.height,
-                            backgroundColor: z.color,
-                            border: '1px solid rgba(34, 197, 94, 0.5)',
-                        }}
-                    />
-                )
-            ))}
-            {tempZoneStyle && (
-                <div 
-                    style={{
-                        position: 'absolute',
-                        top: tempZoneStyle.top,
-                        left: tempZoneStyle.left,
-                        width: tempZoneStyle.width,
-                        height: tempZoneStyle.height,
-                        backgroundColor: 'rgba(34, 197, 94, 0.2)',
-                        border: '1px solid rgba(34, 197, 94, 0.8)',
-                    }}
-                />
-            )}
-        </div>
 
         <div className="absolute top-4 left-4 z-20 bg-slate-900/80 backdrop-blur px-3 py-1 rounded text-xs font-mono text-emerald-400 border border-emerald-900 pointer-events-none shadow-lg">
           LIVE: {currentPrice.toFixed(2)}
@@ -508,11 +343,6 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
         {isDrawingMode && (
             <div className="absolute top-4 right-4 z-20 bg-amber-500/20 border border-amber-500 text-amber-400 px-3 py-1 rounded text-xs font-bold animate-pulse pointer-events-none">
                 DRAWING MODE ACTIVE
-            </div>
-        )}
-        {isZoneMode && (
-            <div className="absolute top-4 right-4 z-20 bg-emerald-500/20 border border-emerald-500 text-emerald-400 px-3 py-1 rounded text-xs font-bold animate-pulse pointer-events-none">
-                ZONE TOOL ACTIVE
             </div>
         )}
       </div>

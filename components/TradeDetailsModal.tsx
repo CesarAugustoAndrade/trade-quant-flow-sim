@@ -65,8 +65,13 @@ export const TradeDetailsModal: React.FC<TradeDetailsModalProps> = ({ trade, onC
               
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center p-2 rounded hover:bg-slate-800 transition-colors">
-                  <span className="text-slate-400">EMA (200)</span>
+                  <span className="text-slate-400">EMA 1</span>
                   <span className="font-mono text-yellow-400">{trade.snapshot.ema.toFixed(2)}</span>
+                </div>
+
+                <div className="flex justify-between items-center p-2 rounded hover:bg-slate-800 transition-colors">
+                  <span className="text-slate-400">EMA 2</span>
+                  <span className="font-mono text-cyan-400">{trade.snapshot.ema2.toFixed(2)}</span>
                 </div>
                 
                 <div className="flex justify-between items-center p-2 rounded hover:bg-slate-800 transition-colors">
