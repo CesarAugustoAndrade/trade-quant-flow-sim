@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { MarketEngine } from './services/marketEngine';
-import { StreamingMACD, StreamingEMA } from './services/indicators';
+import { StreamingMACD, StreamingEMA, StreamingHMA } from './services/indicators';
 import { FinancialChart } from './components/FinancialChart';
 import { TradeDetailsModal } from './components/TradeDetailsModal';
 import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot } from './types';
@@ -50,11 +49,18 @@ export default function App() {
   const [emaColor, setEmaColor] = useState('#facc15'); // Default Yellow
   const [isEma1Visible, setIsEma1Visible] = useState(true);
   
-  // EMA 2
-  const [ema2Data, setEma2Data] = useState<{time: number, value: number}[]>([]);
-  const [ema2Period, setEma2Period] = useState(50);
-  const [ema2Color, setEma2Color] = useState('#06b6d4'); // Default Cyan
-  const [isEma2Visible, setIsEma2Visible] = useState(true);
+  // HMA 2 (Was EMA 2)
+  const [hma2Data, setHma2Data] = useState<{time: number, value: number}[]>([]);
+  const [hma2Period, setHma2Period] = useState(50);
+  const [hma2Color, setHma2Color] = useState('#06b6d4'); // Default Cyan
+  const [isHma2Visible, setIsHma2Visible] = useState(true);
+
+  // HMA 1 (Hull Suite)
+  const [hmaData, setHmaData] = useState<{time: number, value: number}[]>([]);
+  const [hmaBandData, setHmaBandData] = useState<{time: number, value: number}[]>([]);
+  const [hmaPeriod, setHmaPeriod] = useState(100);
+  const [hmaColor, setHmaColor] = useState('#a855f7'); // Default Violet
+  const [isHmaVisible, setIsHmaVisible] = useState(true);
 
   const [trades, setTrades] = useState<Trade[]>([]);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -89,14 +95,16 @@ export default function App() {
   const marketEngineRef = useRef<MarketEngine | null>(null);
   const macdEngineRef = useRef<StreamingMACD | null>(null);
   const emaEngineRef = useRef<StreamingEMA | null>(null);
-  const ema2EngineRef = useRef<StreamingEMA | null>(null);
+  const hma2EngineRef = useRef<StreamingHMA | null>(null); // New HMA 2 Engine
+  const hmaEngineRef = useRef<StreamingHMA | null>(null); // HMA 1 Engine
   
   // State Refs for loop access
   const configRef = useRef(config);
   const candlesRef = useRef(candles); 
   const macdDataRef = useRef(macdData); // Needed for snapshot capture in hotkeys
   const emaDataRef = useRef(emaData);   // Needed for snapshot capture in hotkeys
-  const ema2DataRef = useRef(ema2Data); // Needed for snapshot capture in hotkeys
+  const hma2DataRef = useRef(hma2Data); // Needed for snapshot capture in hotkeys
+  const hmaDataRef = useRef(hmaData);   // Needed for snapshot capture in hotkeys
   const slPointsRef = useRef(slPoints);
   const tpPointsRef = useRef(tpPoints);
   
@@ -109,7 +117,8 @@ export default function App() {
   useEffect(() => { candlesRef.current = candles; }, [candles]);
   useEffect(() => { macdDataRef.current = macdData; }, [macdData]);
   useEffect(() => { emaDataRef.current = emaData; }, [emaData]);
-  useEffect(() => { ema2DataRef.current = ema2Data; }, [ema2Data]);
+  useEffect(() => { hma2DataRef.current = hma2Data; }, [hma2Data]);
+  useEffect(() => { hmaDataRef.current = hmaData; }, [hmaData]);
   useEffect(() => { slPointsRef.current = slPoints; }, [slPoints]);
   useEffect(() => { tpPointsRef.current = tpPoints; }, [tpPoints]);
 
@@ -120,20 +129,27 @@ export default function App() {
 
       // 1. Instantiate new engines with updated settings
       const newEmaEngine = new StreamingEMA(emaPeriod);
-      const newEma2Engine = new StreamingEMA(ema2Period);
+      const newHma2Engine = new StreamingHMA(hma2Period);
+      const newHmaEngine = new StreamingHMA(hmaPeriod);
       const newMacdEngine = new StreamingMACD(macdSettings.fast, macdSettings.slow, macdSettings.signal);
 
       // 2. Replay history
       const newEmaData: {time: number, value: number}[] = [];
-      const newEma2Data: {time: number, value: number}[] = [];
+      const newHma2Data: {time: number, value: number}[] = [];
+      const newHmaData: {time: number, value: number}[] = [];
+      const newHmaBandData: {time: number, value: number}[] = [];
       const newMacdData: MacdData[] = [];
 
       currentCandles.forEach(c => {
           const emaVal = newEmaEngine.next(c.close);
           newEmaData.push({ time: c.time, value: emaVal });
           
-          const ema2Val = newEma2Engine.next(c.close);
-          newEma2Data.push({ time: c.time, value: ema2Val });
+          const hma2Val = newHma2Engine.next(c.close);
+          newHma2Data.push({ time: c.time, value: hma2Val.value }); // Use .value as StreamingHMA returns {value, band}
+
+          const hmaVal = newHmaEngine.next(c.close);
+          newHmaData.push({ time: c.time, value: hmaVal.value });
+          newHmaBandData.push({ time: c.time, value: hmaVal.band });
 
           const macdVal = newMacdEngine.next(c.close);
           const prevHist = newMacdData.length > 0 ? newMacdData[newMacdData.length - 1].value : 0;
@@ -147,17 +163,27 @@ export default function App() {
           });
       });
 
+      // Update Color for HMA 1 (Hull Suite) based on last 2 points
+      if (newHmaData.length > 2) {
+          const last = newHmaData[newHmaData.length - 1].value;
+          const prev2 = newHmaData[newHmaData.length - 3].value;
+          setHmaColor(last > prev2 ? '#00ff00' : '#ff0000');
+      }
+
       // 3. Update State with recalculated data
       setEmaData(newEmaData);
-      setEma2Data(newEma2Data);
+      setHma2Data(newHma2Data);
+      setHmaData(newHmaData);
+      setHmaBandData(newHmaBandData);
       setMacdData(newMacdData);
 
       // 4. Update Refs so the next tick continues from this correct state
       emaEngineRef.current = newEmaEngine;
-      ema2EngineRef.current = newEma2Engine;
+      hma2EngineRef.current = newHma2Engine;
+      hmaEngineRef.current = newHmaEngine;
       macdEngineRef.current = newMacdEngine;
 
-  }, [emaPeriod, ema2Period, macdSettings]); 
+  }, [emaPeriod, hma2Period, hmaPeriod, macdSettings]); 
 
   // --- Helpers ---
   const getSpainTime = (timestamp: number) => {
@@ -269,7 +295,8 @@ export default function App() {
     marketEngineRef.current = new MarketEngine(config.startPrice, startTs);
     macdEngineRef.current = new StreamingMACD(macdSettings.fast, macdSettings.slow, macdSettings.signal);
     emaEngineRef.current = new StreamingEMA(emaPeriod);
-    ema2EngineRef.current = new StreamingEMA(ema2Period);
+    hma2EngineRef.current = new StreamingHMA(hma2Period);
+    hmaEngineRef.current = new StreamingHMA(hmaPeriod);
     
     const rand = Math.random();
     let profile = DayProfile.CHOPPY;
@@ -292,7 +319,9 @@ export default function App() {
     setCandles([]);
     setMacdData([]);
     setEmaData([]);
-    setEma2Data([]);
+    setHma2Data([]);
+    setHmaData([]);
+    setHmaBandData([]);
     setTrades([]);
     setPriceLines([]);
     setIsPlaying(false);
@@ -303,13 +332,15 @@ export default function App() {
   // --- Snapshot Logic ---
   const captureSnapshot = (
       cEmaData: {value: number}[],
-      cEma2Data: {value: number}[],
+      cHma2Data: {value: number}[],
+      cHmaData: {value: number}[],
       cMacdData: MacdData[]
   ): TradeSnapshot | undefined => {
       if (cEmaData.length === 0 || cMacdData.length === 0) return undefined;
 
       const currentEma = cEmaData[cEmaData.length - 1].value;
-      const currentEma2 = cEma2Data.length > 0 ? cEma2Data[cEma2Data.length - 1].value : 0;
+      const currentHma2 = cHma2Data.length > 0 ? cHma2Data[cHma2Data.length - 1].value : 0;
+      const currentHma = cHmaData.length > 0 ? cHmaData[cHmaData.length - 1].value : 0;
       const currentMacd = cMacdData[cMacdData.length - 1];
       // Get previous MACD histogram to determine trend, default to 0 if not available
       const prevHist = cMacdData.length > 1 ? cMacdData[cMacdData.length - 2].value : 0;
@@ -326,7 +357,8 @@ export default function App() {
 
       return {
           ema: currentEma,
-          ema2: currentEma2,
+          hma2: currentHma2,
+          hma: currentHma,
           macd: {
               macd: currentMacd.macd,
               signal: currentMacd.signal,
@@ -347,7 +379,7 @@ export default function App() {
 
     if (isPlaying) {
       intervalId = setInterval(() => {
-        if (!marketEngineRef.current || !macdEngineRef.current || !emaEngineRef.current || !ema2EngineRef.current) return;
+        if (!marketEngineRef.current || !macdEngineRef.current || !emaEngineRef.current || !hma2EngineRef.current || !hmaEngineRef.current) return;
 
         let currentVol = configRef.current.volatility;
         let currentDrift = configRef.current.drift;
@@ -373,7 +405,8 @@ export default function App() {
         const newCandle = marketEngineRef.current.nextTick(currentDrift, currentVol, CANDLE_TIME_STEP);
         const newMacd = macdEngineRef.current.next(newCandle.close);
         const newEmaVal = emaEngineRef.current.next(newCandle.close);
-        const newEma2Val = ema2EngineRef.current.next(newCandle.close);
+        const newHma2Val = hma2EngineRef.current.next(newCandle.close);
+        const newHmaVal = hmaEngineRef.current.next(newCandle.close);
 
         setCandles(prev => {
             const next = [...prev, newCandle];
@@ -400,10 +433,38 @@ export default function App() {
             return next;
         });
 
-        setEma2Data(prev => {
-            const next = [...prev, { time: newCandle.time, value: newEma2Val }];
+        setHma2Data(prev => {
+            const next = [...prev, { time: newCandle.time, value: newHma2Val.value }];
             if (next.length > 300) next.shift();
             return next;
+        });
+
+        setHmaData(prev => {
+            const next = [...prev, { time: newCandle.time, value: newHmaVal.value }];
+            if (next.length > 300) next.shift();
+            
+            // Check trend color logic for HMA 1 (Hull Suite)
+            // Need at least 2 points to compare HMA[0] vs HMA[2]. 
+            // In live loop, we look at the just added value vs value 2 ticks ago.
+            // Using prev array is safer for history, but for simplicity we can use local calculation if needed.
+            // Alternatively, we update color state based on this new value vs last known.
+            return next;
+        });
+
+        setHmaBandData(prev => {
+            const next = [...prev, { time: newCandle.time, value: newHmaVal.band }];
+            if (next.length > 300) next.shift();
+            return next;
+        });
+
+        // Dynamic Hull Suite Color Update
+        setHmaData(prevHma => {
+            if (prevHma.length > 2) {
+                const current = prevHma[prevHma.length - 1].value;
+                const prev2 = prevHma[prevHma.length - 3].value;
+                setHmaColor(current > prev2 ? '#00ff00' : '#ff0000');
+            }
+            return prevHma;
         });
 
       }, config.tickSpeedMs); 
@@ -507,6 +568,15 @@ export default function App() {
           setIsDrawingMode(prev => !prev);
           return;
       }
+      
+      if (key === 'z') {
+        // Removes the oldest line (FIFO)
+        setPriceLines(prev => {
+            if (prev.length === 0) return prev;
+            return prev.slice(1);
+        });
+        return;
+      }
 
       if (key !== 'a' && key !== 's') return;
 
@@ -529,7 +599,7 @@ export default function App() {
             ? (type === TradeType.LONG ? currentPrice + tp : currentPrice - tp)
             : undefined;
 
-      const snapshot = captureSnapshot(emaDataRef.current, ema2DataRef.current, macdDataRef.current);
+      const snapshot = captureSnapshot(emaDataRef.current, hma2DataRef.current, hmaDataRef.current, macdDataRef.current);
 
       const newTrade: Trade = {
             id: Math.random().toString(36).substr(2, 9),
@@ -563,7 +633,7 @@ export default function App() {
         ? (type === TradeType.LONG ? currentPrice + tpPoints : currentPrice - tpPoints)
         : undefined;
 
-    const snapshot = captureSnapshot(emaData, ema2Data, macdData);
+    const snapshot = captureSnapshot(emaData, hma2Data, hmaData, macdData);
 
     const newTrade: Trade = {
         id: Math.random().toString(36).substr(2, 9),
@@ -620,7 +690,7 @@ export default function App() {
     const headers = [
       "ID", "Type", "Status", "Entry Price", "Exit Price", "PnL", 
       "Entry Time", "Exit Time", "Exit Reason", 
-      "EMA 1 (Entry)", "EMA 2 (Entry)", "MACD Value", "Signal Value", "Histogram", "Momentum Trend"
+      "EMA 1 (Entry)", "HMA 2 (Entry)", "HMA (Entry)", "MACD Value", "Signal Value", "Histogram", "Momentum Trend"
     ].join(",");
 
     const rows = trades.map(trade => {
@@ -629,7 +699,8 @@ export default function App() {
       
       const snap = trade.snapshot;
       const ema = snap ? snap.ema.toFixed(2) : "";
-      const ema2 = snap ? snap.ema2.toFixed(2) : "";
+      const hma2 = snap ? snap.hma2.toFixed(2) : "";
+      const hma = snap ? snap.hma.toFixed(2) : "";
       const macd = snap ? snap.macd.macd.toFixed(3) : "";
       const signal = snap ? snap.macd.signal.toFixed(3) : "";
       const hist = snap ? snap.macd.histogram.toFixed(3) : "";
@@ -646,7 +717,8 @@ export default function App() {
         exitTimeStr,
         trade.exitReason || "",
         ema,
-        ema2,
+        hma2,
+        hma,
         macd,
         signal,
         hist,
@@ -858,39 +930,75 @@ export default function App() {
                     />
                 </div>
 
-                {/* EMA 2 Control */}
+                {/* HMA 2 Control (Replaced EMA 2) */}
                 <div className="space-y-2 mb-4">
                      <div className="flex justify-between items-center">
                         <div className="flex items-center gap-2">
-                            <button onClick={() => setIsEma2Visible(!isEma2Visible)} className="text-slate-500 hover:text-white transition-colors">
-                                {isEma2Visible ? <EyeIcon /> : <EyeOffIcon />}
+                            <button onClick={() => setIsHma2Visible(!isHma2Visible)} className="text-slate-500 hover:text-white transition-colors">
+                                {isHma2Visible ? <EyeIcon /> : <EyeOffIcon />}
                             </button>
-                            <label className="text-xs text-slate-500">EMA 2 Period</label>
+                            <label className="text-xs text-slate-500">HMA 2 Period</label>
                         </div>
                         <div className="flex items-center gap-2">
                             <input 
                                 type="color" 
-                                value={ema2Color} 
-                                onChange={(e) => setEma2Color(e.target.value)}
+                                value={hma2Color} 
+                                onChange={(e) => setHma2Color(e.target.value)}
                                 className="w-4 h-4 rounded cursor-pointer border-none p-0 bg-transparent"
-                                title="EMA 2 Color"
+                                title="HMA 2 Color"
                             />
                             <input
                                 type="number"
                                 min="1"
-                                value={ema2Period}
-                                onChange={(e) => setEma2Period(parseInt(e.target.value) || 1)}
+                                value={hma2Period}
+                                onChange={(e) => setHma2Period(parseInt(e.target.value) || 1)}
                                 className="bg-transparent text-right font-mono text-xs w-10 border-b border-transparent focus:border-indigo-500 focus:bg-slate-900/50 outline-none transition-all p-0"
-                                style={{color: ema2Color}}
+                                style={{color: hma2Color}}
                             />
                         </div>
                      </div>
                     <input 
                         type="range" min="5" max="200" step="5"
-                        value={ema2Period}
-                        onChange={(e) => setEma2Period(parseInt(e.target.value))}
+                        value={hma2Period}
+                        onChange={(e) => setHma2Period(parseInt(e.target.value))}
                         className="w-full accent-cyan-500 bg-slate-700 h-1 rounded appearance-none cursor-pointer"
-                        style={{accentColor: ema2Color}}
+                        style={{accentColor: hma2Color}}
+                    />
+                </div>
+
+                {/* HMA Control (Original Hull Suite) */}
+                <div className="space-y-2 mb-4">
+                     <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => setIsHmaVisible(!isHmaVisible)} className="text-slate-500 hover:text-white transition-colors">
+                                {isHmaVisible ? <EyeIcon /> : <EyeOffIcon />}
+                            </button>
+                            <label className="text-xs text-slate-500">HMA Period</label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <input 
+                                type="color" 
+                                value={hmaColor} 
+                                onChange={(e) => setHmaColor(e.target.value)}
+                                className="w-4 h-4 rounded cursor-pointer border-none p-0 bg-transparent"
+                                title="HMA Color"
+                            />
+                            <input
+                                type="number"
+                                min="1"
+                                value={hmaPeriod}
+                                onChange={(e) => setHmaPeriod(parseInt(e.target.value) || 1)}
+                                className="bg-transparent text-right font-mono text-xs w-10 border-b border-transparent focus:border-indigo-500 focus:bg-slate-900/50 outline-none transition-all p-0"
+                                style={{color: hmaColor}}
+                            />
+                        </div>
+                     </div>
+                    <input 
+                        type="range" min="5" max="300" step="5"
+                        value={hmaPeriod}
+                        onChange={(e) => setHmaPeriod(parseInt(e.target.value))}
+                        className="w-full accent-violet-500 bg-slate-700 h-1 rounded appearance-none cursor-pointer"
+                        style={{accentColor: hmaColor}}
                     />
                 </div>
 
@@ -947,16 +1055,17 @@ export default function App() {
                 {/* Active Levels List */}
                 {priceLines.length > 0 && (
                      <div className="mt-3 border-t border-slate-700 pt-3">
-                        {priceLines.length > 0 && (
-                            <div className="flex flex-wrap gap-2 mb-2">
-                                {priceLines.map((price, idx) => (
-                                    <div key={idx} className="flex items-center gap-1 text-[10px] bg-slate-700 px-2 py-1 rounded border border-slate-600">
-                                        <span className="text-pink-400 font-mono">{price.toFixed(2)}</span>
-                                        <button onClick={() => removeLine(idx)} className="text-slate-400 hover:text-white">×</button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
+                        <div className="flex flex-wrap gap-2 mb-2">
+                            {priceLines.map((price, idx) => (
+                                <div key={idx} className="flex items-center gap-1 text-[10px] bg-slate-700 px-2 py-1 rounded border border-slate-600">
+                                    <span className="text-pink-400 font-mono">{price.toFixed(2)}</span>
+                                    <button onClick={() => removeLine(idx)} className="text-slate-400 hover:text-white">×</button>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="text-[9px] text-slate-600 italic text-right">
+                            (Press 'Z' to remove oldest)
+                        </div>
                      </div>
                 )}
             </div>
@@ -1108,13 +1217,17 @@ export default function App() {
                 currentPrice={currentPrice}
                 priceLines={priceLines}
                 emaData={emaData}
-                ema2Data={ema2Data}
+                hma2Data={hma2Data}
+                hmaData={hmaData}
+                hmaBandData={hmaBandData}
                 isDrawingMode={isDrawingMode}
                 macdConfig={macdSettings}
                 emaColor={emaColor}
-                ema2Color={ema2Color}
+                hma2Color={hma2Color}
+                hmaColor={hmaColor}
                 isEma1Visible={isEma1Visible}
-                isEma2Visible={isEma2Visible}
+                isHma2Visible={isHma2Visible}
+                isHmaVisible={isHmaVisible}
                 isMacdVisible={isMacdVisible}
                 onChartClick={handleChartClick}
             />

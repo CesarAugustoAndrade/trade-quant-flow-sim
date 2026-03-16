@@ -1,4 +1,8 @@
 
+
+
+
+
 import React from 'react';
 import { Trade, TradeType } from '../types';
 
@@ -70,8 +74,13 @@ export const TradeDetailsModal: React.FC<TradeDetailsModalProps> = ({ trade, onC
                 </div>
 
                 <div className="flex justify-between items-center p-2 rounded hover:bg-slate-800 transition-colors">
-                  <span className="text-slate-400">EMA 2</span>
-                  <span className="font-mono text-cyan-400">{trade.snapshot.ema2.toFixed(2)}</span>
+                  <span className="text-slate-400">HMA 2</span>
+                  <span className="font-mono text-cyan-400">{trade.snapshot.hma2.toFixed(2)}</span>
+                </div>
+
+                <div className="flex justify-between items-center p-2 rounded hover:bg-slate-800 transition-colors">
+                  <span className="text-slate-400">HMA 1</span>
+                  <span className="font-mono text-violet-400">{trade.snapshot.hma.toFixed(2)}</span>
                 </div>
                 
                 <div className="flex justify-between items-center p-2 rounded hover:bg-slate-800 transition-colors">

@@ -1,5 +1,6 @@
 
 
+
 export enum TradeType {
   LONG = 'LONG',
   SHORT = 'SHORT',
@@ -23,7 +24,8 @@ export interface MacdData {
 
 export interface TradeSnapshot {
   ema: number; // EMA 1
-  ema2: number; // EMA 2
+  hma2: number; // HMA 2 (was EMA 2)
+  hma: number; // HMA 1 (Hull Suite)
   macd: {
     macd: number;
     signal: number;

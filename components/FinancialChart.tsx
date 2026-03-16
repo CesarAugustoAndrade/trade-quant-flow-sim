@@ -1,4 +1,8 @@
 
+
+
+
+
 import React, { useEffect, useRef } from 'react';
 import { CandleData, MacdData } from '../types';
 
@@ -8,14 +12,18 @@ interface FinancialChartProps {
   priceLines: number[];
   currentPrice: number;
   emaData: { time: number; value: number }[];
-  ema2Data: { time: number; value: number }[];
+  hma2Data: { time: number; value: number }[]; // Was EMA 2
+  hmaData: { time: number; value: number }[];
+  hmaBandData: { time: number; value: number }[];
   isDrawingMode: boolean;
   isEma1Visible: boolean;
-  isEma2Visible: boolean;
+  isHma2Visible: boolean; // Was EMA 2
+  isHmaVisible: boolean;
   isMacdVisible: boolean;
   macdConfig?: { fast: number; slow: number; signal: number };
   emaColor?: string;
-  ema2Color?: string;
+  hma2Color?: string; // Was EMA 2
+  hmaColor?: string;
   onChartClick: (price: number) => void;
 }
 
@@ -25,14 +33,18 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
   priceLines,
   currentPrice,
   emaData,
-  ema2Data,
+  hma2Data,
+  hmaData,
+  hmaBandData,
   isDrawingMode,
   isEma1Visible,
-  isEma2Visible,
+  isHma2Visible,
+  isHmaVisible,
   isMacdVisible,
   macdConfig = { fast: 35, slow: 115, signal: 18 },
   emaColor = '#facc15', // Default yellow
-  ema2Color = '#06b6d4', // Default Cyan
+  hma2Color = '#06b6d4', // Default Cyan
+  hmaColor = '#a855f7', // Default Violet
   onChartClick,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -46,7 +58,9 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
   // Series Refs
   const candleSeriesRef = useRef<any>(null);
   const emaSeriesRef = useRef<any>(null); // EMA 1
-  const ema2SeriesRef = useRef<any>(null); // EMA 2
+  const hma2SeriesRef = useRef<any>(null); // HMA 2 (was EMA 2)
+  const hmaSeriesRef = useRef<any>(null); // HMA 1
+  const hmaBandSeriesRef = useRef<any>(null); // HMA 1 Band
   const histogramSeriesRef = useRef<any>(null);
   const macdLineSeriesRef = useRef<any>(null);
   const signalLineSeriesRef = useRef<any>(null);
@@ -65,7 +79,7 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
     }
 
     // @ts-ignore
-    const { createChart, ColorType, CandlestickSeries, HistogramSeries, LineSeries, CrosshairMode } = window.LightweightCharts;
+    const { createChart, ColorType, CandlestickSeries, HistogramSeries, LineSeries, CrosshairMode, LineStyle } = window.LightweightCharts;
 
     const commonOptions = {
       layout: {
@@ -120,13 +134,32 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
       visible: isEma1Visible,
     });
 
-    // EMA Series 2
-    const ema2Series = mainChart.addSeries(LineSeries, {
-      color: ema2Color, 
+    // HMA Series 2 (Was EMA 2)
+    const hma2Series = mainChart.addSeries(LineSeries, {
+      color: hma2Color, 
       lineWidth: 2,
       crosshairMarkerVisible: false,
       priceLineVisible: false,
-      visible: isEma2Visible,
+      visible: isHma2Visible,
+    });
+
+    // HMA Series 1 Band (Subtle)
+    const hmaBandSeries = mainChart.addSeries(LineSeries, {
+        color: hmaColor,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        crosshairMarkerVisible: false,
+        priceLineVisible: false,
+        visible: isHmaVisible,
+    });
+
+    // HMA Series 1 Main
+    const hmaSeries = mainChart.addSeries(LineSeries, {
+      color: hmaColor, 
+      lineWidth: 2,
+      crosshairMarkerVisible: false,
+      priceLineVisible: false,
+      visible: isHmaVisible,
     });
 
     // --- Indicator Chart (MACD) ---
@@ -195,7 +228,9 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
     indicatorChartRef.current = indicatorChart;
     candleSeriesRef.current = candleSeries;
     emaSeriesRef.current = emaSeries;
-    ema2SeriesRef.current = ema2Series;
+    hma2SeriesRef.current = hma2Series;
+    hmaSeriesRef.current = hmaSeries;
+    hmaBandSeriesRef.current = hmaBandSeries;
     histogramSeriesRef.current = histogramSeries;
     macdLineSeriesRef.current = macdLineSeries;
     signalLineSeriesRef.current = signalLineSeries;
@@ -246,20 +281,28 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
     if (emaSeriesRef.current) {
       emaSeriesRef.current.applyOptions({ color: emaColor });
     }
-    if (ema2SeriesRef.current) {
-      ema2SeriesRef.current.applyOptions({ color: ema2Color });
+    if (hma2SeriesRef.current) {
+      hma2SeriesRef.current.applyOptions({ color: hma2Color });
     }
-  }, [emaColor, ema2Color]);
+    if (hmaSeriesRef.current) {
+      hmaSeriesRef.current.applyOptions({ color: hmaColor });
+    }
+    if (hmaBandSeriesRef.current) {
+        hmaBandSeriesRef.current.applyOptions({ color: hmaColor });
+    }
+  }, [emaColor, hma2Color, hmaColor]);
 
   // Update Visibility
   useEffect(() => {
     if (emaSeriesRef.current) emaSeriesRef.current.applyOptions({ visible: isEma1Visible });
-    if (ema2SeriesRef.current) ema2SeriesRef.current.applyOptions({ visible: isEma2Visible });
+    if (hma2SeriesRef.current) hma2SeriesRef.current.applyOptions({ visible: isHma2Visible });
+    if (hmaSeriesRef.current) hmaSeriesRef.current.applyOptions({ visible: isHmaVisible });
+    if (hmaBandSeriesRef.current) hmaBandSeriesRef.current.applyOptions({ visible: isHmaVisible });
     
     if (histogramSeriesRef.current) histogramSeriesRef.current.applyOptions({ visible: isMacdVisible });
     if (macdLineSeriesRef.current) macdLineSeriesRef.current.applyOptions({ visible: isMacdVisible });
     if (signalLineSeriesRef.current) signalLineSeriesRef.current.applyOptions({ visible: isMacdVisible });
-  }, [isEma1Visible, isEma2Visible, isMacdVisible]);
+  }, [isEma1Visible, isHma2Visible, isHmaVisible, isMacdVisible]);
 
   // Update Cursor Styles based on mode
   useEffect(() => {
@@ -281,11 +324,13 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
 
   // Data Update Effect
   useEffect(() => {
-    if (!candleSeriesRef.current || !histogramSeriesRef.current || !emaSeriesRef.current || !ema2SeriesRef.current) return;
+    if (!candleSeriesRef.current || !histogramSeriesRef.current || !emaSeriesRef.current || !hma2SeriesRef.current || !hmaSeriesRef.current) return;
 
     candleSeriesRef.current.setData(candles);
     emaSeriesRef.current.setData(emaData);
-    ema2SeriesRef.current.setData(ema2Data);
+    hma2SeriesRef.current.setData(hma2Data);
+    hmaSeriesRef.current.setData(hmaData);
+    if(hmaBandSeriesRef.current) hmaBandSeriesRef.current.setData(hmaBandData);
 
     // Map MACD data
     const histData = macdData.map(d => ({ 
@@ -300,7 +345,7 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({
     macdLineSeriesRef.current.setData(macdLineData);
     signalLineSeriesRef.current.setData(signalLineData);
 
-  }, [candles, macdData, emaData, ema2Data]);
+  }, [candles, macdData, emaData, hma2Data, hmaData, hmaBandData]);
 
   // Price Lines Effect (Horizontal Levels)
   useEffect(() => {
