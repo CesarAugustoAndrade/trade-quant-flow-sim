@@ -151,7 +151,7 @@ export default function App() {
   const [macdSettings, setMacdSettings] = useState({ fast: 35, slow: 115, signal: 18 });
   const [isMacdVisible, setIsMacdVisible] = useState(true);
   const [atrPeriod, setAtrPeriod] = useState(14);
-  const [isAtrEnabled, setIsAtrEnabled] = useState(false);
+  const [isAtrEnabled, setIsAtrEnabled] = useState(true);
   const [currentAtr, setCurrentAtr] = useState(0);
   const [macdDashboard, setMacdDashboard] = useState<MacdDashboardData>({
     ema1hTrend: 'BEARISH', macdVsZero: 0, macdVsSignal: 0, histogramRising: false,
@@ -451,7 +451,6 @@ export default function App() {
     hmaEngineRef.current = new StreamingHMA(hmaPeriod);
     atrEngineRef.current = new StreamingATR(atrPeriod);
     setCurrentAtr(0);
-    setIsAtrEnabled(false);
 
     const rand = Math.random();
     let profile = DayProfile.CHOPPY;
