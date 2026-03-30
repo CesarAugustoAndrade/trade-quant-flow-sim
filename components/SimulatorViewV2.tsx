@@ -62,6 +62,15 @@ function TBtn({ active, onClick, children, title, className = '' }: { active?: b
   );
 }
 
+function DashRow({ label, children, lbl, row, txtL }: { label: string; children: React.ReactNode; lbl: string; row: string; txtL: string }) {
+  return (
+    <div className="flex items-center" style={{ borderBottom: '1px solid #ffffff08' }}>
+      <div className="flex-1 px-2 py-1 text-[9px] truncate" style={{ background: lbl, color: txtL }}>{label}</div>
+      <div className="px-2 py-1 text-right text-[10px]" style={{ background: row, minWidth: '80px' }}>{children}</div>
+    </div>
+  );
+}
+
 function MacdDashboardPanel({ data }: { data: MacdDashboardData }) {
   const hdr = '#0f3460';
   const lbl = '#1a1a2e';
@@ -70,45 +79,56 @@ function MacdDashboardPanel({ data }: { data: MacdDashboardData }) {
   const g = '#089981';
   const r = '#f23645';
   return (
-    <div className="shrink-0 flex" style={{ background: '#0a0a1a', borderTop: '1px solid #363a45', height: '140px' }}>
-      <table className="flex-1 text-[10px] font-mono" style={{ borderCollapse: 'collapse' }}>
-        <tbody>
-          <tr>
-            <td colSpan={2} className="px-3 py-0.5 text-center font-bold tracking-wider" style={{ background: hdr, color: '#fff', fontSize: '9px' }}>
-              MACD DASHBOARD ({data.macdParams.fast}/{data.macdParams.slow}/{data.macdParams.signal})
-            </td>
-          </tr>
-          <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL, width: '50%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>1H EMA {data.ema1hParams.fast} vs {data.ema1hParams.slow}</td>
-            <td className="px-3 text-right font-bold" style={{ background: row, color: data.ema1hTrend === 'BULLISH' ? g : r }}>{data.ema1hTrend}</td>
-          </tr>
-          <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>MACD vs Zero</td>
-            <td className="px-3 text-right" style={{ background: row, color: data.macdVsZero >= 0 ? g : r }}>{data.macdVsZero.toFixed(4)}</td>
-          </tr>
-          <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>MACD vs Signal</td>
-            <td className="px-3 text-right" style={{ background: row, color: data.macdVsSignal >= 0 ? g : r }}>{data.macdVsSignal.toFixed(4)}</td>
-          </tr>
-          <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>Histogram</td>
-            <td className="px-3 text-right font-bold" style={{ background: row, color: data.histogramRising ? g : r }}>{data.histogramRising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}</td>
-          </tr>
-          <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>Divergence (200 bars)</td>
-            <td className="px-3 text-right" style={{ background: row, color: data.divergence === 'None' ? '#666' : data.divergence.includes('BULL') ? g : r }}>{data.divergence}</td>
-          </tr>
-          <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>ATR ({data.atrPeriod}) — Chart TF</td>
-            <td className="px-3 text-right" style={{ background: row, color: '#00d2ff' }}>{data.atr.toFixed(5)}</td>
-          </tr>
-          <tr><td colSpan={2} style={{ background: hdr, height: '1px' }} /></tr>
-          <tr>
-            <td className="px-3 py-1 font-bold" style={{ background: hdr, color: '#fff', fontSize: '12px' }}>DRIFT</td>
-            <td className="px-3 py-1 text-right font-bold" style={{ background: '#0a0a1a', color: data.driftColor, fontSize: '12px' }}>{data.driftLabel}  {data.driftPct.toFixed(1)}%</td>
-          </tr>
-        </tbody>
-      </table>
+    <div className="flex flex-col h-full text-[10px] font-mono" style={{ background: '#0a0a1a' }}>
+      {/* Header */}
+      <div className="px-2 py-1.5 text-center font-bold tracking-wider" style={{ background: hdr, color: '#fff', fontSize: '9px' }}>
+        MACD DASHBOARD
+      </div>
+      <div className="px-2 py-0.5 text-center" style={{ background: hdr, color: '#8899aa', fontSize: '8px', borderBottom: '1px solid #363a45' }}>
+        {data.macdParams.fast}/{data.macdParams.slow}/{data.macdParams.signal}
+      </div>
+
+      {/* Rows */}
+      <div className="flex flex-col flex-1">
+        {/* 1H EMA */}
+        <DashRow label={`1H EMA ${data.ema1hParams.fast}/${data.ema1hParams.slow}`} lbl={lbl} row={row} txtL={txtL}>
+          <span className="font-bold" style={{ color: data.ema1hTrend === 'BULLISH' ? g : r }}>{data.ema1hTrend}</span>
+        </DashRow>
+        {/* MACD vs Zero */}
+        <DashRow label="MACD vs Zero" lbl={lbl} row={row} txtL={txtL}>
+          <span style={{ color: data.macdVsZero >= 0 ? g : r }}>{data.macdVsZero.toFixed(4)}</span>
+        </DashRow>
+        {/* MACD vs Signal */}
+        <DashRow label="MACD vs Signal" lbl={lbl} row={row} txtL={txtL}>
+          <span style={{ color: data.macdVsSignal >= 0 ? g : r }}>{data.macdVsSignal.toFixed(4)}</span>
+        </DashRow>
+        {/* Histogram */}
+        <DashRow label="Histogram" lbl={lbl} row={row} txtL={txtL}>
+          <span className="font-bold" style={{ color: data.histogramRising ? g : r }}>{data.histogramRising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}</span>
+        </DashRow>
+        {/* Divergence */}
+        <DashRow label="Divergence" lbl={lbl} row={row} txtL={txtL}>
+          <span style={{ color: data.divergence === 'None' ? '#666' : data.divergence.includes('BULL') ? g : r }}>{data.divergence}</span>
+        </DashRow>
+        {/* ATR */}
+        <DashRow label={`ATR (${data.atrPeriod})`} lbl={lbl} row={row} txtL={txtL}>
+          <span style={{ color: '#00d2ff' }}>{data.atr.toFixed(5)}</span>
+        </DashRow>
+      </div>
+
+      {/* Separator */}
+      <div style={{ height: '1px', background: hdr }} />
+
+      {/* Drift Score */}
+      <div className="px-2 py-2" style={{ background: '#0a0a1a' }}>
+        <div className="text-[9px] uppercase tracking-wider mb-1" style={{ color: '#666' }}>Drift Score</div>
+        <div className="font-bold text-center" style={{ color: data.driftColor, fontSize: '14px' }}>
+          {data.driftLabel}
+        </div>
+        <div className="text-center font-bold mt-0.5" style={{ color: data.driftColor, fontSize: '18px' }}>
+          {data.driftPct.toFixed(1)}%
+        </div>
+      </div>
     </div>
   );
 }
@@ -703,14 +723,16 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
           </div>
         </div>
 
+        {/* ========== MACD DASHBOARD (right-side) ========== */}
+        {props.macdDashboard && (
+          <div className="shrink-0 border-l flex flex-col" style={{ width: '220px', borderColor: TV.border, background: '#0a0a1a' }}>
+            <MacdDashboardPanel data={props.macdDashboard} />
+          </div>
+        )}
+
       </div>
 
       <ToastNotification messages={toasts} onDismiss={dismissToast} />
-
-      {/* ========== MACD DASHBOARD ========== */}
-      {props.macdDashboard && (
-        <MacdDashboardPanel data={props.macdDashboard} />
-      )}
 
       {/* ========== BOTTOM PANEL ========== */}
       <div className="shrink-0 border-t" style={{ borderColor: TV.border, background: TV.panel }}>
