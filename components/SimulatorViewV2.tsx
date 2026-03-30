@@ -138,10 +138,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastIdRef = useRef(0);
-  const [isEquityCollapsed, setIsEquityCollapsed] = useState(true);
-  const equityChartRef = useRef<any>(null);
-  const equitySeriesRef = useRef<any>(null);
-  const equityContainerRef = useRef<HTMLDivElement>(null);
+
 
   const addToast = (type: ToastMessage['type'], text: string) => {
     const id = ++toastIdRef.current;
@@ -169,80 +166,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
     prevTradesRef.current = trades;
   }, [trades]);
 
-  // Equity chart creation effect
-  useEffect(() => {
-    if (isEquityCollapsed || !equityContainerRef.current) return;
-    if (equityChartRef.current) return; // already created
 
-    const { createChart } = (window as any).LightweightCharts;
-    const chart = createChart(equityContainerRef.current, {
-      width: equityContainerRef.current.clientWidth,
-      height: 100,
-      layout: { background: { color: 'transparent' }, textColor: '#666' },
-      grid: { vertLines: { visible: false }, horzLines: { color: '#ffffff08' } },
-      timeScale: { visible: false },
-      rightPriceScale: { borderVisible: false, textColor: '#666' },
-      crosshair: { mode: 0 },
-      handleScroll: false,
-      handleScale: false,
-    });
-
-    const series = chart.addAreaSeries({
-      topColor: '#08998133',
-      bottomColor: '#f2364533',
-      lineColor: '#089981',
-      lineWidth: 1,
-      priceLineVisible: false,
-      lastValueVisible: false,
-    });
-
-    equityChartRef.current = chart;
-    equitySeriesRef.current = series;
-
-    return () => {
-      chart.remove();
-      equityChartRef.current = null;
-      equitySeriesRef.current = null;
-    };
-  }, [isEquityCollapsed]);
-
-  // Equity data update effect
-  useEffect(() => {
-    if (!equitySeriesRef.current || isEquityCollapsed) return;
-    const closed = trades
-      .filter(t => t.status === 'CLOSED' && t.closeTime !== undefined)
-      .sort((a, b) => (a.closeTime! - b.closeTime!));
-
-    if (closed.length === 0) return;
-
-    let cumPnl = 0;
-    const data = closed.map(t => {
-      cumPnl += t.pnl ?? 0;
-      return { time: t.closeTime as number, value: cumPnl };
-    });
-
-    const finalPnl = data[data.length - 1]?.value ?? 0;
-    equitySeriesRef.current.applyOptions({
-      lineColor: finalPnl >= 0 ? '#089981' : '#f23645',
-      topColor: finalPnl >= 0 ? '#08998133' : '#f2364500',
-      bottomColor: finalPnl >= 0 ? '#f2364500' : '#f2364533',
-    });
-
-    equitySeriesRef.current.setData(data);
-  }, [trades, isEquityCollapsed]);
-
-  const equityStats = useMemo(() => {
-    const closed = trades.filter(t => t.status === 'CLOSED').sort((a, b) => (a.closeTime ?? 0) - (b.closeTime ?? 0));
-    let cumPnl = 0, peak = 0, maxDrawdown = 0;
-    closed.forEach(t => {
-      cumPnl += t.pnl ?? 0;
-      if (cumPnl > peak) peak = cumPnl;
-      const drawdown = peak - cumPnl;
-      if (drawdown > maxDrawdown) maxDrawdown = drawdown;
-    });
-    const maxDrawdownPct = peak > 0 ? (maxDrawdown / peak) * 100 : 0;
-    return { peak, maxDrawdownPct };
-  }, [trades]);
 
   const openTrades = trades.filter(t => t.status === 'OPEN');
   const pendingTrades = trades.filter(t => t.status === 'PENDING');
@@ -779,31 +703,6 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
           </div>
         </div>
 
-        {/* ========== EQUITY CURVE PANEL (right-side) ========== */}
-        <div className="shrink-0 border-l flex flex-col" style={{ width: '180px', borderColor: TV.border, background: TV.panel }}>
-          {/* Equity Curve Panel */}
-          <div className="border-t border-white/5">
-            <div
-              className="flex items-center justify-between px-3 py-1.5 cursor-pointer select-none"
-              style={{ background: TV.panel }}
-              onClick={() => setIsEquityCollapsed(v => !v)}
-            >
-              <span className="text-[10px] font-mono uppercase tracking-wider" style={{ color: '#666' }}>
-                Equity Curve
-              </span>
-              <span className="text-[10px]" style={{ color: '#444' }}>{isEquityCollapsed ? '▶' : '▼'}</span>
-            </div>
-            {!isEquityCollapsed && (
-              <div style={{ background: TV.bg }}>
-                <div ref={equityContainerRef} style={{ height: 100, width: '100%' }} />
-                <div className="flex justify-between px-3 pb-2 text-[9px] font-mono" style={{ color: '#555' }}>
-                  <span>Peak: <span style={{ color: '#089981' }}>${equityStats.peak.toFixed(2)}</span></span>
-                  <span>Max DD: <span style={{ color: '#f23645' }}>{equityStats.maxDrawdownPct.toFixed(1)}%</span></span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
       <ToastNotification messages={toasts} onDismiss={dismissToast} />
