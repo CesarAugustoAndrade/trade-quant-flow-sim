@@ -64,7 +64,7 @@ function TBtn({ active, onClick, children, title, className = '' }: { active?: b
 
 export function SimulatorViewV2(props: SimulatorViewProps) {
   const {
-    candles, macdData, macd15Data, emaData, hma2Data, hmaData, hmaBandData, priceLines, trades, pnl, selectedTrade,
+    candles, macdData, emaData, hma2Data, hmaData, hmaBandData, priceLines, trades, pnl, selectedTrade,
     config, macdSettings, emaPeriod, hma2Period, hmaPeriod, emaColor, hma2Color, hmaColor,
     isEma1Visible, isHma2Visible, isHmaVisible, isMacdVisible, slPoints, tpPoints, pipSize, pipValue,
     isPlaying, isAutoMode, isBlindMode, isDrawingMode, currentSessionLabel,
@@ -351,7 +351,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
               <FinancialChart
                 candles={candles}
                 macdData={macdData}
-                macd15Data={macd15Data}
+                macdDashboard={props.macdDashboard}
                 currentPrice={currentPrice}
                 priceLines={priceLines}
                 emaData={emaData}
