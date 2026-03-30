@@ -164,3 +164,41 @@ export class StreamingHMA {
     this.wmaSmooth.reset();
   }
 }
+
+export class StreamingATR {
+  private period: number;
+  private prevClose: number | null = null;
+  private atr: number | null = null;
+  private trBuffer: number[] = [];
+
+  constructor(period = 14) {
+    this.period = period;
+  }
+
+  next(high: number, low: number, close: number): number {
+    const tr = this.prevClose === null
+      ? high - low
+      : Math.max(high - low, Math.abs(high - this.prevClose), Math.abs(low - this.prevClose));
+    this.prevClose = close;
+
+    if (this.atr === null) {
+      this.trBuffer.push(tr);
+      if (this.trBuffer.length >= this.period) {
+        this.atr = this.trBuffer.reduce((a, b) => a + b, 0) / this.period;
+        this.trBuffer = [];
+      }
+      return this.trBuffer.length > 0
+        ? this.trBuffer.reduce((a, b) => a + b, 0) / this.trBuffer.length
+        : this.atr!;
+    }
+    // Wilder's smoothing (RMA)
+    this.atr = (this.atr * (this.period - 1) + tr) / this.period;
+    return this.atr;
+  }
+
+  reset() {
+    this.prevClose = null;
+    this.atr = null;
+    this.trBuffer = [];
+  }
+}
