@@ -39,7 +39,7 @@ export interface Trade {
   type: TradeType;
   entryPrice: number;
   entryTime: number; // UNIX timestamp
-  status: 'OPEN' | 'CLOSED';
+  status: 'OPEN' | 'CLOSED' | 'PENDING';
   closePrice?: number;
   closeTime?: number;
   pnl?: number;
@@ -49,9 +49,106 @@ export interface Trade {
   snapshot?: TradeSnapshot;
 }
 
+export interface SessionStats {
+  winRate: number;
+  avgRR: number;
+  profitFactor: number;
+  largestWin: number;
+  largestLoss: number;
+  maxConsecWins: number;
+  maxConsecLosses: number;
+  totalPips: number;
+  avgDurationMinutes: number;
+}
+
 export interface MarketConfig {
   volatility: number;
   drift: number;
   tickSpeedMs: number;
   startPrice: number;
 }
+
+export enum SimulationType {
+  GBM = 'GBM',
+  MOMENTUM = 'MOMENTUM',
+  OU = 'OU',
+  GARCH = 'GARCH',
+}
+
+export enum MarketPreset {
+  GENERIC = 'GENERIC',
+  EURUSD = 'EURUSD',
+}
+
+export interface MarketPresetConfig {
+  preset: MarketPreset;
+  label: string;
+  startPrice: number;
+  volatility: number;
+  drift: number;
+  slPoints: number;
+  tpPoints: number;
+  ouMeanLevel: number;
+  ouReversionSpeed: number;
+  ouVolatility: number;
+  momentumVolatility: number;
+  momentumTrendStrength: number;
+  momentumDrift: number;
+  garchOmega: number;
+  garchAlpha: number;
+  garchBeta: number;
+  garchDrift: number;
+  pricePrecision: number;
+  pipSize: number;
+  pipValue: number;
+  spread: number;
+}
+
+export const MARKET_PRESETS: Record<MarketPreset, MarketPresetConfig> = {
+  [MarketPreset.GENERIC]: {
+    preset: MarketPreset.GENERIC,
+    label: 'Generic',
+    startPrice: 1105,
+    volatility: 0.002,
+    drift: 0.0001,
+    slPoints: 1,
+    tpPoints: 2,
+    ouMeanLevel: 1105,
+    ouReversionSpeed: 0.01,
+    ouVolatility: 1.5,
+    momentumVolatility: 0.002,
+    momentumTrendStrength: 0.6,
+    momentumDrift: 0.0001,
+    garchOmega: 0.000001,
+    garchAlpha: 0.10,
+    garchBeta: 0.85,
+    garchDrift: 0.0001,
+    pricePrecision: 2,
+    pipSize: 1,
+    pipValue: 1,
+    spread: 1,
+  },
+  [MarketPreset.EURUSD]: {
+    preset: MarketPreset.EURUSD,
+    label: 'EUR/USD',
+    startPrice: 1.0850,
+    volatility: 0.0003,
+    drift: 0.00001,
+    slPoints: 0.03,
+    tpPoints: 0,
+    ouMeanLevel: 1.0850,
+    ouReversionSpeed: 0.005,
+    ouVolatility: 0.0008,
+    momentumVolatility: 0.0003,
+    momentumTrendStrength: 0.55,
+    momentumDrift: 0.00001,
+    garchOmega: 0.0000001,
+    garchAlpha: 0.08,
+    garchBeta: 0.88,
+    garchDrift: 0.00001,
+    pricePrecision: 5,
+    pipSize: 0.0001,
+    pipValue: 0.2,
+    spread: 0.00010,
+  },
+};
