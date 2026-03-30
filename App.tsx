@@ -718,6 +718,9 @@ export default function App() {
       if (key === ' ') { e.preventDefault(); setIsPlaying(prev => !prev); return; }
       if (key === 'd') { setIsDrawingMode(prev => !prev); return; }
       if (key === 'z') { setPriceLines(prev => prev.length === 0 ? prev : prev.slice(1)); return; }
+      // Speed shortcuts: 1=20ms, 2=60ms, 3=120ms, 4=200ms, 5=300ms, 6=420ms, 7=560ms, 8=720ms, 9=900ms, 0=1000ms
+      const speedMap: Record<string, number> = { '1': 20, '2': 60, '3': 120, '4': 200, '5': 300, '6': 420, '7': 560, '8': 720, '9': 900, '0': 1000 };
+      if (speedMap[key]) { setConfig(prev => ({ ...prev, tickSpeedMs: speedMap[key] })); return; }
       if (key === 'x') {
         if (candlesRef.current.length === 0) return;
         setTrades(prev => {

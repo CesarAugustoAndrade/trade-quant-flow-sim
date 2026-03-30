@@ -359,6 +359,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
                   ['C', 'All SL to Breakeven'],
                   ['D', 'Toggle Drawing'],
                   ['Z', 'Remove Oldest Line'],
+                  ['1-0', 'Speed (20ms–1000ms)'],
                 ].map(([key, desc]) => (
                   <div key={key} className="flex justify-between py-0.5">
                     <kbd className="px-1.5 py-0.5 rounded text-[10px] font-mono" style={{ background: TV.bg, color: TV.text }}>{key}</kbd>
