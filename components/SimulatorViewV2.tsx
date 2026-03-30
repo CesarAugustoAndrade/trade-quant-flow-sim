@@ -3,7 +3,7 @@ import { FinancialChart } from './FinancialChart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { TradeDetailsModal } from './TradeDetailsModal';
 import { SimulatorViewProps } from './SimulatorView';
-import { TradeType, SimulationType, MacdDashboardData } from '../types';
+import { TradeType, SimulationType, MacdDashboardData, RsiDashboardData } from '../types';
 import { ToastNotification, ToastMessage } from './ToastNotification';
 
 // --- TradingView Color Palette ---
@@ -114,6 +114,76 @@ function MacdDashboardPanel({ data }: { data: MacdDashboardData }) {
   );
 }
 
+function RsiDashboardPanel({ data }: { data: RsiDashboardData }) {
+  const ob = '#089981';
+  const os = '#f23645';
+  const neutral = '#8899aa';
+  const rsiColor = data.rsi > 80 ? ob : data.rsi < 20 ? os : neutral;
+  const signalColor = '#ff5d00';
+  const bgBar = '#1a1a2e';
+
+  // RSI bar fill width (0-100 mapped to percentage)
+  const fillPct = Math.max(0, Math.min(100, data.rsi));
+
+  return (
+    <div className="flex flex-col text-[10px] font-mono" style={{ background: '#0a0a1a' }}>
+      {/* Header */}
+      <div className="px-2 py-1 text-center font-bold tracking-wider" style={{ background: '#0f3460', color: '#fff', fontSize: '9px' }}>
+        ULTIMATE RSI <span style={{ color: '#8899aa', fontWeight: 'normal' }}>{data.length}/{data.signalLength}</span>
+      </div>
+
+      {/* RSI Value — large */}
+      <div className="px-3 py-3 text-center" style={{ background: '#0a0a1a' }}>
+        <div className="text-[22px] font-bold" style={{ color: rsiColor }}>
+          {data.rsi.toFixed(1)}
+        </div>
+        <div className="text-[9px] mt-0.5 uppercase tracking-wider" style={{ color: rsiColor }}>
+          {data.zone}
+        </div>
+      </div>
+
+      {/* RSI Bar */}
+      <div className="mx-2 mb-2 rounded-full overflow-hidden" style={{ height: '6px', background: '#16213e' }}>
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{
+            width: `${fillPct}%`,
+            background: data.rsi > 80 ? ob : data.rsi < 20 ? os : `linear-gradient(90deg, ${os}, ${neutral}, ${ob})`,
+          }}
+        />
+      </div>
+
+      {/* Levels */}
+      <div className="flex justify-between px-2 text-[8px] mb-2" style={{ color: '#555' }}>
+        <span>0</span>
+        <span style={{ color: os }}>20</span>
+        <span>50</span>
+        <span style={{ color: ob }}>80</span>
+        <span>100</span>
+      </div>
+
+      {/* Signal line */}
+      <DashRow label="Signal" lbl={bgBar} row="#16213e" txtL="#8899aa">
+        <span style={{ color: signalColor }}>{data.signal.toFixed(1)}</span>
+      </DashRow>
+
+      {/* RSI vs Signal */}
+      <DashRow label="RSI vs Signal" lbl={bgBar} row="#16213e" txtL="#8899aa">
+        <span style={{ color: data.rsi > data.signal ? ob : os }}>
+          {data.rsi > data.signal ? '\u25b2 ABOVE' : '\u25bc BELOW'}
+        </span>
+      </DashRow>
+
+      {/* Distance from midline */}
+      <DashRow label="vs Midline (50)" lbl={bgBar} row="#16213e" txtL="#8899aa">
+        <span style={{ color: data.rsi > 50 ? ob : os }}>
+          {(data.rsi - 50).toFixed(1)}
+        </span>
+      </DashRow>
+    </div>
+  );
+}
+
 export function SimulatorViewV2(props: SimulatorViewProps) {
   const {
     candles, macdData, emaData, hma2Data, hmaData, hmaBandData, priceLines, trades, pnl, selectedTrade,
@@ -137,6 +207,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
   const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'history' | 'journal'>('positions');
   const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [sidebarPanel, setSidebarPanel] = useState<'macd' | 'rsi'>('macd');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastIdRef = useRef(0);
 
@@ -630,7 +701,23 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
 
         {/* ========== RIGHT SIDEBAR: Dashboard + Order Entry ========== */}
         <div className="shrink-0 border-l flex flex-col" style={{ width: '220px', borderColor: TV.border, background: '#0a0a1a' }}>
-          {props.macdDashboard && <MacdDashboardPanel data={props.macdDashboard} />}
+          {/* Panel toggle */}
+          <div className="flex" style={{ borderBottom: `1px solid ${TV.border}` }}>
+            <button
+              onClick={() => setSidebarPanel('macd')}
+              className="flex-1 py-1 text-[9px] font-bold uppercase tracking-wider text-center transition-colors"
+              style={{ background: sidebarPanel === 'macd' ? '#0f3460' : '#0a0a1a', color: sidebarPanel === 'macd' ? '#fff' : '#555' }}
+            >MACD</button>
+            <button
+              onClick={() => setSidebarPanel('rsi')}
+              className="flex-1 py-1 text-[9px] font-bold uppercase tracking-wider text-center transition-colors"
+              style={{ background: sidebarPanel === 'rsi' ? '#0f3460' : '#0a0a1a', color: sidebarPanel === 'rsi' ? '#fff' : '#555' }}
+            >RSI</button>
+          </div>
+
+          {/* Active panel */}
+          {sidebarPanel === 'macd' && props.macdDashboard && <MacdDashboardPanel data={props.macdDashboard} />}
+          {sidebarPanel === 'rsi' && props.rsiDashboard && <RsiDashboardPanel data={props.rsiDashboard} />}
 
           {/* Spacer */}
           <div className="flex-1" />

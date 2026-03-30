@@ -202,3 +202,83 @@ export class StreamingATR {
     this.trBuffer = [];
   }
 }
+
+// RMA (Wilder's smoothing) — same as EMA with k = 1/period
+class StreamingRMA {
+  private period: number;
+  private value: number | null = null;
+
+  constructor(period: number) {
+    this.period = period;
+  }
+
+  next(x: number): number {
+    if (this.value === null) {
+      this.value = x;
+    } else {
+      this.value = (x + this.value * (this.period - 1)) / this.period;
+    }
+    return this.value;
+  }
+
+  reset() { this.value = null; }
+}
+
+export class StreamingUltimateRSI {
+  private length: number;
+  private buffer: number[] = [];       // rolling window of close prices
+  private prevUpper: number | null = null;
+  private prevLower: number | null = null;
+  private prevSrc: number | null = null;
+  private numRma: StreamingRMA;
+  private denRma: StreamingRMA;
+  private signalEma: StreamingEMA;
+
+  constructor(length = 14, signalLength = 14) {
+    this.length = length;
+    this.numRma = new StreamingRMA(length);
+    this.denRma = new StreamingRMA(length);
+    this.signalEma = new StreamingEMA(signalLength);
+  }
+
+  next(close: number): { rsi: number; signal: number } {
+    this.buffer.push(close);
+    if (this.buffer.length > this.length) this.buffer.shift();
+
+    const upper = Math.max(...this.buffer);
+    const lower = Math.min(...this.buffer);
+    const r = upper - lower;
+
+    let diff: number;
+    if (this.prevSrc === null || this.prevUpper === null || this.prevLower === null) {
+      diff = 0;
+    } else if (upper > this.prevUpper) {
+      diff = r;
+    } else if (lower < this.prevLower) {
+      diff = -r;
+    } else {
+      diff = close - this.prevSrc;
+    }
+
+    this.prevUpper = upper;
+    this.prevLower = lower;
+    this.prevSrc = close;
+
+    const num = this.numRma.next(diff);
+    const den = this.denRma.next(Math.abs(diff));
+    const arsi = den !== 0 ? (num / den) * 50 + 50 : 50;
+    const signal = this.signalEma.next(arsi);
+
+    return { rsi: arsi, signal };
+  }
+
+  reset() {
+    this.buffer = [];
+    this.prevUpper = null;
+    this.prevLower = null;
+    this.prevSrc = null;
+    this.numRma.reset();
+    this.denRma.reset();
+    this.signalEma.reset();
+  }
+}

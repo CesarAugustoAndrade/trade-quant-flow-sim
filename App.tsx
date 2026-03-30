@@ -3,11 +3,11 @@ import { MarketEngine } from './services/marketEngine';
 import { MomentumEngine } from './services/momentumEngine';
 import { OUEngine } from './services/ouEngine';
 import { GARCHEngine } from './services/garchEngine';
-import { StreamingMACD, StreamingEMA, StreamingHMA, StreamingATR } from './services/indicators';
+import { StreamingMACD, StreamingEMA, StreamingHMA, StreamingATR, StreamingUltimateRSI } from './services/indicators';
 import { SimulationMenu } from './components/SimulationMenu';
 import { SimulatorView } from './components/SimulatorView';
 import { SimulatorViewV2 } from './components/SimulatorViewV2';
-import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, SimulationType, MarketPreset, MARKET_PRESETS, SessionStats, MacdDashboardData } from './types';
+import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, SimulationType, MarketPreset, MARKET_PRESETS, SessionStats, MacdDashboardData, RsiDashboardData } from './types';
 
 const CANDLE_TIME_STEP = 60;
 
@@ -158,6 +158,9 @@ export default function App() {
     divergence: 'None', atr: 0, driftLabel: 'NEUTRAL', driftPct: 0, driftColor: '#facc15',
     macdParams: { fast: 35, slow: 115, signal: 18 }, ema1hParams: { fast: 35, slow: 115 }, atrPeriod: 14,
   });
+  const [rsiDashboard, setRsiDashboard] = useState<RsiDashboardData>({
+    rsi: 50, signal: 50, zone: 'NEUTRAL', length: 14, signalLength: 14,
+  });
 
   // --- Trading State ---
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -201,6 +204,7 @@ export default function App() {
   const hma2EngineRef = useRef<StreamingHMA | null>(null);
   const hmaEngineRef = useRef<StreamingHMA | null>(null);
   const atrEngineRef = useRef<StreamingATR | null>(null);
+  const rsiEngineRef = useRef<StreamingUltimateRSI | null>(null);
   const isAtrEnabledRef = useRef(isAtrEnabled);
   const currentAtrRef = useRef(currentAtr);
   // 15-min MACD state tracking
@@ -334,6 +338,17 @@ export default function App() {
     setCurrentAtr(lastAtrVal);
     atrEngineRef.current = newAtrEngine;
 
+    // Replay RSI
+    const newRsiEngine = new StreamingUltimateRSI(14, 14);
+    let lastRsi = { rsi: 50, signal: 50 };
+    currentCandles.forEach(c => { lastRsi = newRsiEngine.next(c.close); });
+    rsiEngineRef.current = newRsiEngine;
+    setRsiDashboard({
+      rsi: lastRsi.rsi, signal: lastRsi.signal,
+      zone: lastRsi.rsi > 80 ? 'OVERBOUGHT' : lastRsi.rsi < 20 ? 'OVERSOLD' : 'NEUTRAL',
+      length: 14, signalLength: 14,
+    });
+
     // Replay 1H EMA
     const new1h35Engine = new StreamingEMA(35);
     const new1h115Engine = new StreamingEMA(115);
@@ -450,6 +465,7 @@ export default function App() {
     hma2EngineRef.current = new StreamingHMA(hma2Period);
     hmaEngineRef.current = new StreamingHMA(hmaPeriod);
     atrEngineRef.current = new StreamingATR(atrPeriod);
+    rsiEngineRef.current = new StreamingUltimateRSI(14, 14);
     setCurrentAtr(0);
 
     const rand = Math.random();
@@ -590,6 +606,14 @@ export default function App() {
           const newAtrVal = atrEngineRef.current.next(newCandle.high, newCandle.low, newCandle.close);
           setCurrentAtr(newAtrVal);
           currentAtrRef.current = newAtrVal;
+        }
+        if (rsiEngineRef.current) {
+          const rsiVal = rsiEngineRef.current.next(newCandle.close);
+          setRsiDashboard({
+            rsi: rsiVal.rsi, signal: rsiVal.signal,
+            zone: rsiVal.rsi > 80 ? 'OVERBOUGHT' : rsiVal.rsi < 20 ? 'OVERSOLD' : 'NEUTRAL',
+            length: 14, signalLength: 14,
+          });
         }
 
         setCandles(prev => {
@@ -995,6 +1019,7 @@ export default function App() {
           onAtrEnabledChange={setIsAtrEnabled}
           sessionStats={sessionStats}
           macdDashboard={macdDashboard}
+          rsiDashboard={rsiDashboard}
         />
       ) : (
         <SimulatorView
@@ -1075,6 +1100,7 @@ export default function App() {
           onAtrEnabledChange={setIsAtrEnabled}
           sessionStats={sessionStats}
           macdDashboard={macdDashboard}
+          rsiDashboard={rsiDashboard}
         />
       )}
     </div>

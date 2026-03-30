@@ -61,6 +61,14 @@ export interface SessionStats {
   avgDurationMinutes: number;
 }
 
+export interface RsiDashboardData {
+  rsi: number;
+  signal: number;
+  zone: 'OVERBOUGHT' | 'OVERSOLD' | 'NEUTRAL';
+  length: number;
+  signalLength: number;
+}
+
 export interface MacdDashboardData {
   ema1hTrend: 'BULLISH' | 'BEARISH';
   macdVsZero: number;

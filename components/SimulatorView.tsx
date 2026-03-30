@@ -2,7 +2,7 @@ import React from 'react';
 import { FinancialChart } from './FinancialChart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { TradeDetailsModal } from './TradeDetailsModal';
-import { CandleData, MacdData, Trade, TradeType, MarketConfig, SimulationType, SessionStats, MacdDashboardData } from '../types';
+import { CandleData, MacdData, Trade, TradeType, MarketConfig, SimulationType, SessionStats, MacdDashboardData, RsiDashboardData } from '../types';
 
 // Icons
 const PlayIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
@@ -118,6 +118,7 @@ export interface SimulatorViewProps {
   onAtrEnabledChange: (v: boolean) => void;
   sessionStats: SessionStats;
   macdDashboard: MacdDashboardData;
+  rsiDashboard: RsiDashboardData;
 }
 
 export function SimulatorView(props: SimulatorViewProps) {
