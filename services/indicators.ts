@@ -189,7 +189,7 @@ export class StreamingATR {
       }
       return this.trBuffer.length > 0
         ? this.trBuffer.reduce((a, b) => a + b, 0) / this.trBuffer.length
-        : this.atr!;
+        : this.atr ?? 0;
     }
     // Wilder's smoothing (RMA)
     this.atr = (this.atr * (this.period - 1) + tr) / this.period;

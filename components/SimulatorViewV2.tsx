@@ -51,7 +51,7 @@ function TBtn({ active, onClick, children, title, className = '' }: { active?: b
       title={title}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
-      className={`px-2.5 py-1.5 text-xs rounded transition-colors ${active ? 'text-[#2962ff]' : ''} ${className}`}
+      className={`px-2.5 py-1.5 text-xs rounded transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${active ? 'text-[#2962ff]' : ''} ${className}`}
       style={{
         background: active ? '#2962ff33' : hovered ? TV.panelHover : 'transparent',
         color: active ? '#2962ff' : hovered ? TV.text : TV.textSec,
@@ -67,8 +67,8 @@ function MacdDashboardPanel({ data }: { data: MacdDashboardData }) {
   const lbl = '#1a1a2e';
   const row = '#16213e';
   const txtL = '#8899aa';
-  const g = '#00ff00';
-  const r = '#ff0000';
+  const g = '#089981';
+  const r = '#f23645';
   return (
     <div className="shrink-0 flex" style={{ background: '#0a0a1a', borderTop: '1px solid #363a45', height: '140px' }}>
       <table className="flex-1 text-[10px] font-mono" style={{ borderCollapse: 'collapse' }}>
@@ -79,27 +79,27 @@ function MacdDashboardPanel({ data }: { data: MacdDashboardData }) {
             </td>
           </tr>
           <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL, width: '50%' }}>1H EMA {data.ema1hParams.fast} vs {data.ema1hParams.slow}</td>
+            <td className="px-3" style={{ background: lbl, color: txtL, width: '50%', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>1H EMA {data.ema1hParams.fast} vs {data.ema1hParams.slow}</td>
             <td className="px-3 text-right font-bold" style={{ background: row, color: data.ema1hTrend === 'BULLISH' ? g : r }}>{data.ema1hTrend}</td>
           </tr>
           <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL }}>MACD vs Zero</td>
+            <td className="px-3" style={{ background: lbl, color: txtL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>MACD vs Zero</td>
             <td className="px-3 text-right" style={{ background: row, color: data.macdVsZero >= 0 ? g : r }}>{data.macdVsZero.toFixed(4)}</td>
           </tr>
           <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL }}>MACD vs Signal</td>
+            <td className="px-3" style={{ background: lbl, color: txtL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>MACD vs Signal</td>
             <td className="px-3 text-right" style={{ background: row, color: data.macdVsSignal >= 0 ? g : r }}>{data.macdVsSignal.toFixed(4)}</td>
           </tr>
           <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL }}>Histogram</td>
+            <td className="px-3" style={{ background: lbl, color: txtL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>Histogram</td>
             <td className="px-3 text-right font-bold" style={{ background: row, color: data.histogramRising ? g : r }}>{data.histogramRising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}</td>
           </tr>
           <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL }}>Divergence (200 bars)</td>
+            <td className="px-3" style={{ background: lbl, color: txtL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>Divergence (200 bars)</td>
             <td className="px-3 text-right" style={{ background: row, color: data.divergence === 'None' ? '#666' : data.divergence.includes('BULL') ? g : r }}>{data.divergence}</td>
           </tr>
           <tr>
-            <td className="px-3" style={{ background: lbl, color: txtL }}>ATR ({data.atrPeriod}) — Chart TF</td>
+            <td className="px-3" style={{ background: lbl, color: txtL, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '0' }}>ATR ({data.atrPeriod}) — Chart TF</td>
             <td className="px-3 text-right" style={{ background: row, color: '#00d2ff' }}>{data.atr.toFixed(5)}</td>
           </tr>
           <tr><td colSpan={2} style={{ background: hdr, height: '1px' }} /></tr>
@@ -282,7 +282,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
           </div>
 
           {/* Reset */}
-          <TBtn onClick={onReset} title="Reset Simulation"><RefreshIcon /></TBtn>
+          <TBtn onClick={() => { if (window.confirm('Reset simulation? All trades will be cleared.')) onReset(); }} title="Reset Simulation"><RefreshIcon /></TBtn>
 
           <div className="w-px h-5 mx-1" style={{ background: TV.border }} />
 
@@ -337,7 +337,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
           </div>
 
           {/* PnL */}
-          <div className="font-mono text-xs font-bold px-2.5 py-1 rounded" style={{ background: pnl >= 0 ? '#08998118' : '#f2364518', color: pnl >= 0 ? TV.green : TV.red, transition: 'color 300ms, background 300ms' }}>
+          <div className="font-mono text-xs font-bold px-2.5 py-1 rounded" style={{ background: pnl >= 0 ? '#08998118' : '#f2364518', color: pnl >= 0 ? TV.green : TV.red, transition: 'color 300ms ease-in-out, background 300ms ease-in-out' }}>
             ${pnl.toFixed(2)}
           </div>
 
@@ -522,6 +522,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
             borderColor: TV.border,
             background: TV.panel,
             opacity: isSettingsOpen ? 1 : 0,
+            pointerEvents: isSettingsOpen ? 'auto' : 'none',
             transition: 'width 200ms ease, opacity 200ms ease',
             transitionDelay: '0ms, 150ms',
           }}
@@ -887,7 +888,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
                   const rawDiff = trade.type === TradeType.LONG ? currentPrice - trade.entryPrice : trade.entryPrice - currentPrice;
                   const livePnl = trade.status === 'CLOSED' ? trade.pnl : trade.status === 'PENDING' ? 0 : (rawDiff / pipSize) * pipValue;
                   return (
-                    <tr key={trade.id} className={`border-t hover:bg-white/[0.05] transition-colors duration-150 group${trade.status === 'OPEN' ? ` border-l-2 ${trade.type === TradeType.LONG ? 'border-l-green-500' : 'border-l-red-500'}` : ''}`} style={{ borderColor: TV.border + '66' }}>
+                    <tr key={trade.id} className={`border-t hover:bg-white/10 transition-colors duration-150 group${trade.status === 'OPEN' ? ` border-l-2 ${trade.type === TradeType.LONG ? 'border-l-green-500' : 'border-l-red-500'}` : ''}`} style={{ borderColor: TV.border + '66' }}>
                       <td className="px-3 py-2 font-bold" style={{ color: trade.type === TradeType.LONG ? TV.green : TV.red }}>
                         {trade.type === TradeType.LONG ? 'LONG' : 'SHORT'}
                       </td>

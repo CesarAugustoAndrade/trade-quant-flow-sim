@@ -25,12 +25,13 @@ export class GARCHEngine {
     // Clamp alpha+beta < 1 for stationarity
     const ab = alpha + beta;
     if (ab >= 1) {
-      alpha = alpha / (ab + 0.01);
-      beta = beta / (ab + 0.01);
+      const scale = 0.99 / ab;
+      alpha = alpha * scale;
+      beta = beta * scale;
     }
 
     // GARCH(1,1): sigma^2_t = omega + alpha*eps^2_{t-1} + beta*sigma^2_{t-1}
-    const variance = omega + alpha * this.prevEps * this.prevEps + beta * this.currentVariance;
+    const variance = Math.max(1e-10, omega + alpha * this.prevEps * this.prevEps + beta * this.currentVariance);
     const sigma = Math.sqrt(variance);
 
     const Z = this.getStandardNormal();

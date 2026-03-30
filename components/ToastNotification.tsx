@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
 export interface ToastMessage {
   id: number;
@@ -12,11 +12,15 @@ interface Props {
 }
 
 export const ToastNotification: React.FC<Props> = ({ messages, onDismiss }) => {
+  const scheduledRef = useRef(new Set<number>());
+
   useEffect(() => {
-    if (messages.length === 0) return;
-    const latest = messages[messages.length - 1];
-    const timer = setTimeout(() => onDismiss(latest.id), 3000);
-    return () => clearTimeout(timer);
+    messages.forEach(msg => {
+      if (!scheduledRef.current.has(msg.id)) {
+        scheduledRef.current.add(msg.id);
+        setTimeout(() => onDismiss(msg.id), 3000);
+      }
+    });
   }, [messages, onDismiss]);
 
   if (messages.length === 0) return null;

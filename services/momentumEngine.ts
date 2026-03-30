@@ -18,6 +18,7 @@ export class MomentumEngine {
   }
 
   public nextTick(drift: number, volatility: number, trendStrength: number, timeStepInSeconds: number = 60): CandleData {
+    trendStrength = Math.max(0, Math.min(1, trendStrength));
     const Z = this.getStandardNormal();
     // Autocorrelated return: blend previous return with fresh GBM shock
     const r = trendStrength * this.prevReturn + (1 - trendStrength) * (volatility * Z);

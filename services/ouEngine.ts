@@ -18,7 +18,6 @@ export class OUEngine {
 
   public nextTick(meanLevel: number, reversionSpeed: number, volatility: number, timeStepInSeconds: number = 60): CandleData {
     if (reversionSpeed <= 0 || reversionSpeed >= 1) {
-      console.warn('OU: reversionSpeed must be in (0,1), clamping');
       reversionSpeed = Math.min(0.99, Math.max(0.001, reversionSpeed));
     }
 

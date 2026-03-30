@@ -113,7 +113,7 @@ function computeMacdDashboard(
   const driftPct = driftScore * 100;
 
   const driftLabel = driftScore > 0.5 ? 'STRONG BULL' : driftScore > 0.15 ? 'LEAN BULL' : driftScore > -0.15 ? 'NEUTRAL' : driftScore > -0.5 ? 'LEAN BEAR' : 'STRONG BEAR';
-  const driftColor = driftScore > 0.5 ? '#00ff00' : driftScore > 0.15 ? '#90ee90' : driftScore > -0.15 ? '#facc15' : driftScore > -0.5 ? '#ff6666' : '#ff0000';
+  const driftColor = driftScore > 0.5 ? '#089981' : driftScore > 0.15 ? '#26a69a' : driftScore > -0.15 ? '#787b86' : driftScore > -0.5 ? '#ef5350' : '#f23645';
 
   return {
     ema1hTrend, macdVsZero, macdVsSignal, histogramRising, divergence, atr,
@@ -617,6 +617,11 @@ export default function App() {
         setHmaData(prev => {
           const next = [...prev, { time: newCandle.time, value: newHmaVal.value }];
           if (next.length > 2000) next.shift();
+          if (next.length > 2) {
+            const current = next[next.length - 1].value;
+            const prev2 = next[next.length - 3].value;
+            setHmaColor(current > prev2 ? '#00ff00' : '#ff0000');
+          }
           return next;
         });
         setHmaBandData(prev => {
@@ -640,14 +645,6 @@ export default function App() {
             atrPeriod,
           ));
           return next;
-        });
-        setHmaData(prevHma => {
-          if (prevHma.length > 2) {
-            const current = prevHma[prevHma.length - 1].value;
-            const prev2 = prevHma[prevHma.length - 3].value;
-            setHmaColor(current > prev2 ? '#00ff00' : '#ff0000');
-          }
-          return prevHma;
         });
       }, config.tickSpeedMs);
     }
@@ -687,7 +684,7 @@ export default function App() {
         if (closePrice !== undefined) {
           hasUpdates = true;
           const diff = trade.type === TradeType.LONG ? closePrice - trade.entryPrice : trade.entryPrice - closePrice;
-          const pnl = (diff / pipSizeRef.current) * pipValueRef.current;
+          const pnl = (diff / (pipSizeRef.current || 0.0001)) * pipValueRef.current;
           return { ...trade, status: 'CLOSED', closePrice, closeTime: lastCandle.time, pnl, exitReason: reason } as Trade;
         }
         return trade;
@@ -722,8 +719,7 @@ export default function App() {
       if (key === 'd') { setIsDrawingMode(prev => !prev); return; }
       if (key === 'z') { setPriceLines(prev => prev.length === 0 ? prev : prev.slice(1)); return; }
       if (key === 'x') {
-        const openTrades = candlesRef.current.length > 0 ? undefined : null;
-        if (openTrades === null) return;
+        if (candlesRef.current.length === 0) return;
         setTrades(prev => {
           const lastOpenIdx = prev.findLastIndex(t => t.status === 'OPEN');
           if (lastOpenIdx === -1) return prev;
@@ -734,7 +730,7 @@ export default function App() {
           const xSpread = MARKET_PRESETS[activePresetRef.current].spread ?? 0;
           const closePrice = t.type === TradeType.LONG ? midPrice - xSpread / 2 : midPrice + xSpread / 2;
           const diff = t.type === TradeType.LONG ? closePrice - t.entryPrice : t.entryPrice - closePrice;
-          const profit = (diff / pipSizeRef.current) * pipValueRef.current;
+          const profit = (diff / (pipSizeRef.current || 0.0001)) * pipValueRef.current;
           const updated = [...prev];
           updated[lastOpenIdx] = { ...t, status: 'CLOSED', closePrice, closeTime: currentCandles[currentCandles.length - 1].time, pnl: profit, exitReason: 'MANUAL' };
           return updated;
@@ -839,7 +835,7 @@ export default function App() {
       if (t.id === id && t.status === 'OPEN') {
         const closePrice = t.type === TradeType.LONG ? currentPrice - spread / 2 : currentPrice + spread / 2;
         const diff = t.type === TradeType.LONG ? closePrice - t.entryPrice : t.entryPrice - closePrice;
-        const profit = (diff / pipSizeRef.current) * pipValueRef.current;
+        const profit = (diff / (pipSizeRef.current || 0.0001)) * pipValueRef.current;
         return { ...t, status: 'CLOSED', closePrice, closeTime: candles[candles.length - 1].time, pnl: profit, exitReason: 'MANUAL' };
       }
       return t;
@@ -881,10 +877,10 @@ export default function App() {
     const profitFactor = grossLoss === 0 ? grossProfit : grossProfit / grossLoss;
 
     const avgWinPips = wins.length > 0
-      ? wins.reduce((s, t) => s + Math.abs((t.closePrice ?? t.entryPrice) - t.entryPrice) / 0.0001, 0) / wins.length
+      ? wins.reduce((s, t) => s + Math.abs((t.closePrice ?? t.entryPrice) - t.entryPrice) / (pipSize || 0.0001), 0) / wins.length
       : 0;
     const avgLossPips = losses.length > 0
-      ? losses.reduce((s, t) => s + Math.abs((t.closePrice ?? t.entryPrice) - t.entryPrice) / 0.0001, 0) / losses.length
+      ? losses.reduce((s, t) => s + Math.abs((t.closePrice ?? t.entryPrice) - t.entryPrice) / (pipSize || 0.0001), 0) / losses.length
       : 0;
     const avgRR = avgLossPips === 0 ? avgWinPips : avgWinPips / avgLossPips;
 
@@ -892,7 +888,7 @@ export default function App() {
     const largestLoss = losses.length > 0 ? Math.min(...losses.map(t => t.pnl ?? 0)) : 0;
 
     const totalPips = closed.reduce((s, t) => {
-      const pipDiff = ((t.closePrice ?? t.entryPrice) - t.entryPrice) / 0.0001;
+      const pipDiff = ((t.closePrice ?? t.entryPrice) - t.entryPrice) / (pipSize || 0.0001);
       return s + (t.type === 'LONG' ? pipDiff : -pipDiff);
     }, 0);
 
@@ -909,7 +905,7 @@ export default function App() {
     }, 0) / closed.length;
 
     return { winRate, avgRR, profitFactor, largestWin, largestLoss, maxConsecWins, maxConsecLosses, totalPips, avgDurationMinutes };
-  }, [trades]);
+  }, [trades, pipSize]);
 
   const currentPrice = candles.length > 0 ? candles[candles.length - 1].close : config.startPrice;
   const currentTimeDisplay = candles.length > 0 ? getSpainTime(candles[candles.length - 1].time) : '--:--';
