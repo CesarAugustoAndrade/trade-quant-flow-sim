@@ -79,55 +79,36 @@ function MacdDashboardPanel({ data }: { data: MacdDashboardData }) {
   const g = '#089981';
   const r = '#f23645';
   return (
-    <div className="flex flex-col h-full text-[10px] font-mono" style={{ background: '#0a0a1a' }}>
+    <div className="flex flex-col text-[10px] font-mono" style={{ background: '#0a0a1a' }}>
       {/* Header */}
-      <div className="px-2 py-1.5 text-center font-bold tracking-wider" style={{ background: hdr, color: '#fff', fontSize: '9px' }}>
-        MACD DASHBOARD
-      </div>
-      <div className="px-2 py-0.5 text-center" style={{ background: hdr, color: '#8899aa', fontSize: '8px', borderBottom: '1px solid #363a45' }}>
-        {data.macdParams.fast}/{data.macdParams.slow}/{data.macdParams.signal}
+      <div className="px-2 py-1 text-center font-bold tracking-wider" style={{ background: hdr, color: '#fff', fontSize: '9px' }}>
+        MACD DASHBOARD <span style={{ color: '#8899aa', fontWeight: 'normal' }}>{data.macdParams.fast}/{data.macdParams.slow}/{data.macdParams.signal}</span>
       </div>
 
       {/* Rows */}
-      <div className="flex flex-col flex-1">
-        {/* 1H EMA */}
-        <DashRow label={`1H EMA ${data.ema1hParams.fast}/${data.ema1hParams.slow}`} lbl={lbl} row={row} txtL={txtL}>
-          <span className="font-bold" style={{ color: data.ema1hTrend === 'BULLISH' ? g : r }}>{data.ema1hTrend}</span>
-        </DashRow>
-        {/* MACD vs Zero */}
-        <DashRow label="MACD vs Zero" lbl={lbl} row={row} txtL={txtL}>
-          <span style={{ color: data.macdVsZero >= 0 ? g : r }}>{data.macdVsZero.toFixed(4)}</span>
-        </DashRow>
-        {/* MACD vs Signal */}
-        <DashRow label="MACD vs Signal" lbl={lbl} row={row} txtL={txtL}>
-          <span style={{ color: data.macdVsSignal >= 0 ? g : r }}>{data.macdVsSignal.toFixed(4)}</span>
-        </DashRow>
-        {/* Histogram */}
-        <DashRow label="Histogram" lbl={lbl} row={row} txtL={txtL}>
-          <span className="font-bold" style={{ color: data.histogramRising ? g : r }}>{data.histogramRising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}</span>
-        </DashRow>
-        {/* Divergence */}
-        <DashRow label="Divergence" lbl={lbl} row={row} txtL={txtL}>
-          <span style={{ color: data.divergence === 'None' ? '#666' : data.divergence.includes('BULL') ? g : r }}>{data.divergence}</span>
-        </DashRow>
-        {/* ATR */}
-        <DashRow label={`ATR (${data.atrPeriod})`} lbl={lbl} row={row} txtL={txtL}>
-          <span style={{ color: '#00d2ff' }}>{data.atr.toFixed(5)}</span>
-        </DashRow>
-      </div>
+      <DashRow label={`1H EMA ${data.ema1hParams.fast}/${data.ema1hParams.slow}`} lbl={lbl} row={row} txtL={txtL}>
+        <span className="font-bold" style={{ color: data.ema1hTrend === 'BULLISH' ? g : r }}>{data.ema1hTrend}</span>
+      </DashRow>
+      <DashRow label="MACD vs Zero" lbl={lbl} row={row} txtL={txtL}>
+        <span style={{ color: data.macdVsZero >= 0 ? g : r }}>{data.macdVsZero.toFixed(4)}</span>
+      </DashRow>
+      <DashRow label="MACD vs Signal" lbl={lbl} row={row} txtL={txtL}>
+        <span style={{ color: data.macdVsSignal >= 0 ? g : r }}>{data.macdVsSignal.toFixed(4)}</span>
+      </DashRow>
+      <DashRow label="Histogram" lbl={lbl} row={row} txtL={txtL}>
+        <span className="font-bold" style={{ color: data.histogramRising ? g : r }}>{data.histogramRising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}</span>
+      </DashRow>
+      <DashRow label="Divergence" lbl={lbl} row={row} txtL={txtL}>
+        <span style={{ color: data.divergence === 'None' ? '#666' : data.divergence.includes('BULL') ? g : r }}>{data.divergence}</span>
+      </DashRow>
+      <DashRow label={`ATR (${data.atrPeriod})`} lbl={lbl} row={row} txtL={txtL}>
+        <span style={{ color: '#00d2ff' }}>{data.atr.toFixed(5)}</span>
+      </DashRow>
 
-      {/* Separator */}
-      <div style={{ height: '1px', background: hdr }} />
-
-      {/* Drift Score */}
-      <div className="px-2 py-2" style={{ background: '#0a0a1a' }}>
-        <div className="text-[9px] uppercase tracking-wider mb-1" style={{ color: '#666' }}>Drift Score</div>
-        <div className="font-bold text-center" style={{ color: data.driftColor, fontSize: '14px' }}>
-          {data.driftLabel}
-        </div>
-        <div className="text-center font-bold mt-0.5" style={{ color: data.driftColor, fontSize: '18px' }}>
-          {data.driftPct.toFixed(1)}%
-        </div>
+      {/* Drift Score — compact */}
+      <div className="flex items-center justify-between px-2 py-1.5" style={{ background: hdr, borderTop: '1px solid #363a45' }}>
+        <span className="text-[9px] uppercase" style={{ color: '#8899aa' }}>DRIFT</span>
+        <span className="font-bold" style={{ color: data.driftColor, fontSize: '11px' }}>{data.driftLabel} {data.driftPct.toFixed(1)}%</span>
       </div>
     </div>
   );
@@ -369,82 +350,6 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
             </ErrorBoundary>
           </div>
 
-          {/* Floating Order Entry */}
-          <div className="absolute bottom-4 right-4 z-20 flex flex-col gap-1.5" style={{ width: '220px' }}>
-            {/* Price lines indicator */}
-            {priceLines.length > 0 && (
-              <div className="flex flex-wrap gap-1 justify-end mb-1">
-                {priceLines.map((price, idx) => (
-                  <div key={idx} className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded" style={{ background: '#f472b622', color: '#f472b6', border: '1px solid #f472b644' }}>
-                    {price.toFixed(pricePrecision)}
-                    <button onClick={() => onRemoveLine(idx)} className="hover:text-white">x</button>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Live price */}
-            <div className="text-center font-mono text-sm font-bold py-1 rounded" style={{ background: TV.panel + 'ee', color: TV.text }}>
-              {currentPrice.toFixed(pricePrecision)}
-            </div>
-
-            {/* BUY / SELL */}
-            <div className="flex gap-1.5">
-              <button
-                onClick={() => {
-                  const atrEff = isAtrEnabled && currentAtr > 0 ? currentAtr : 0;
-                  const effSl = atrEff > 0 ? atrEff * 1.5 : slPoints;
-                  const effTp = atrEff > 0 ? atrEff * 3 : tpPoints;
-                  onTrade(TradeType.LONG);
-                  addToast('trade-open', `\u2713 LONG @ ${currentPrice.toFixed(pricePrecision)}${effSl > 0 ? ` | SL: ${(currentPrice - effSl).toFixed(pricePrecision)}` : ''}${effTp > 0 ? ` | TP: ${(currentPrice + effTp).toFixed(pricePrecision)}` : ''}`);
-                }}
-                className="flex-1 py-2.5 rounded font-bold text-sm text-white transition-all active:scale-95 hover:brightness-110"
-                style={{ background: TV.green }}
-              >
-                BUY <span className="opacity-60 text-[10px] font-normal">(A)</span>
-              </button>
-              <button
-                onClick={() => {
-                  const atrEff = isAtrEnabled && currentAtr > 0 ? currentAtr : 0;
-                  const effSl = atrEff > 0 ? atrEff * 1.5 : slPoints;
-                  const effTp = atrEff > 0 ? atrEff * 3 : tpPoints;
-                  onTrade(TradeType.SHORT);
-                  addToast('trade-open', `\u2713 SHORT @ ${currentPrice.toFixed(pricePrecision)}${effSl > 0 ? ` | SL: ${(currentPrice + effSl).toFixed(pricePrecision)}` : ''}${effTp > 0 ? ` | TP: ${(currentPrice - effTp).toFixed(pricePrecision)}` : ''}`);
-                }}
-                className="flex-1 py-2.5 rounded font-bold text-sm text-white transition-all active:scale-95 hover:brightness-110"
-                style={{ background: TV.red }}
-              >
-                SELL <span className="opacity-60 text-[10px] font-normal">(S)</span>
-              </button>
-            </div>
-
-            {/* SL/TP hint */}
-            <div className="text-center text-[10px] font-mono">
-              <span style={{ color: '#f23645aa' }}>SL: {slPoints > 0 ? slPoints : '—'}</span>
-              {' / '}
-              <span style={{ color: '#089981aa' }}>TP: {tpPoints > 0 ? tpPoints : '—'}</span>
-            </div>
-
-            {/* Limit orders */}
-            <div className="flex gap-1.5">
-              <button
-                disabled={priceLines.length === 0}
-                className="flex-1 py-1.5 rounded text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: TV.green + '22', color: TV.green, border: `1px solid ${TV.green}44` }}
-                title="Draw a price line on chart first (D)"
-              >
-                BUY LIM <span className="opacity-60 text-[9px]">(Q)</span>
-              </button>
-              <button
-                disabled={priceLines.length === 0}
-                className="flex-1 py-1.5 rounded text-[11px] font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ background: TV.red + '22', color: TV.red, border: `1px solid ${TV.red}44` }}
-                title="Draw a price line on chart first (D)"
-              >
-                SELL LIM <span className="opacity-60 text-[9px]">(W)</span>
-              </button>
-            </div>
-          </div>
 
           {/* Drawing mode active indicator */}
           {isDrawingMode && (
@@ -723,12 +628,90 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
           </div>
         </div>
 
-        {/* ========== MACD DASHBOARD (right-side) ========== */}
-        {props.macdDashboard && (
-          <div className="shrink-0 border-l flex flex-col" style={{ width: '220px', borderColor: TV.border, background: '#0a0a1a' }}>
-            <MacdDashboardPanel data={props.macdDashboard} />
+        {/* ========== RIGHT SIDEBAR: Dashboard + Order Entry ========== */}
+        <div className="shrink-0 border-l flex flex-col" style={{ width: '220px', borderColor: TV.border, background: '#0a0a1a' }}>
+          {props.macdDashboard && <MacdDashboardPanel data={props.macdDashboard} />}
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Order Entry */}
+          <div className="flex flex-col gap-1.5 p-2" style={{ background: TV.panel, borderTop: `1px solid ${TV.border}` }}>
+            {/* Price lines */}
+            {priceLines.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-0.5">
+                {priceLines.map((price, idx) => (
+                  <div key={idx} className="flex items-center gap-1 text-[9px] font-mono px-1 py-0.5 rounded" style={{ background: '#f472b622', color: '#f472b6', border: '1px solid #f472b644' }}>
+                    {price.toFixed(pricePrecision)}
+                    <button onClick={() => onRemoveLine(idx)} className="hover:text-white">x</button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Live price */}
+            <div className="text-center font-mono text-sm font-bold py-1 rounded" style={{ background: TV.bg, color: TV.text }}>
+              {currentPrice.toFixed(pricePrecision)}
+            </div>
+
+            {/* BUY / SELL */}
+            <div className="flex gap-1.5">
+              <button
+                onClick={() => {
+                  const atrEff = isAtrEnabled && currentAtr > 0 ? currentAtr : 0;
+                  const effSl = atrEff > 0 ? atrEff * 1.5 : slPoints;
+                  const effTp = atrEff > 0 ? atrEff * 3 : tpPoints;
+                  onTrade(TradeType.LONG);
+                  addToast('trade-open', `\u2713 LONG @ ${currentPrice.toFixed(pricePrecision)}${effSl > 0 ? ` | SL: ${(currentPrice - effSl).toFixed(pricePrecision)}` : ''}${effTp > 0 ? ` | TP: ${(currentPrice + effTp).toFixed(pricePrecision)}` : ''}`);
+                }}
+                className="flex-1 py-2 rounded font-bold text-xs text-white transition-all active:scale-95 hover:brightness-110"
+                style={{ background: TV.green }}
+              >
+                BUY <span className="opacity-60 text-[9px] font-normal">(A)</span>
+              </button>
+              <button
+                onClick={() => {
+                  const atrEff = isAtrEnabled && currentAtr > 0 ? currentAtr : 0;
+                  const effSl = atrEff > 0 ? atrEff * 1.5 : slPoints;
+                  const effTp = atrEff > 0 ? atrEff * 3 : tpPoints;
+                  onTrade(TradeType.SHORT);
+                  addToast('trade-open', `\u2713 SHORT @ ${currentPrice.toFixed(pricePrecision)}${effSl > 0 ? ` | SL: ${(currentPrice + effSl).toFixed(pricePrecision)}` : ''}${effTp > 0 ? ` | TP: ${(currentPrice - effTp).toFixed(pricePrecision)}` : ''}`);
+                }}
+                className="flex-1 py-2 rounded font-bold text-xs text-white transition-all active:scale-95 hover:brightness-110"
+                style={{ background: TV.red }}
+              >
+                SELL <span className="opacity-60 text-[9px] font-normal">(S)</span>
+              </button>
+            </div>
+
+            {/* SL/TP hint */}
+            <div className="text-center text-[9px] font-mono">
+              <span style={{ color: '#f23645aa' }}>SL: {slPoints > 0 ? slPoints : '—'}</span>
+              {' / '}
+              <span style={{ color: '#089981aa' }}>TP: {tpPoints > 0 ? tpPoints : '—'}</span>
+            </div>
+
+            {/* Limit orders */}
+            <div className="flex gap-1.5">
+              <button
+                disabled={priceLines.length === 0}
+                className="flex-1 py-1 rounded text-[10px] font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: TV.green + '22', color: TV.green, border: `1px solid ${TV.green}44` }}
+                title="Draw a price line on chart first (D)"
+              >
+                BUY LIM <span className="opacity-60 text-[8px]">(Q)</span>
+              </button>
+              <button
+                disabled={priceLines.length === 0}
+                className="flex-1 py-1 rounded text-[10px] font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ background: TV.red + '22', color: TV.red, border: `1px solid ${TV.red}44` }}
+                title="Draw a price line on chart first (D)"
+              >
+                SELL LIM <span className="opacity-60 text-[8px]">(W)</span>
+              </button>
+            </div>
           </div>
-        )}
+        </div>
 
       </div>
 
