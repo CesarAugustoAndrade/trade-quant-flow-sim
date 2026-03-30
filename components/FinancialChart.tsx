@@ -4,7 +4,6 @@ import { CandleData, MacdData, Trade } from '../types';
 interface FinancialChartProps {
   candles: CandleData[];
   macdData: MacdData[];
-  macd15Data?: MacdData[];
   priceLines: number[];
   trades: Trade[];
   currentPrice: number;
@@ -28,7 +27,6 @@ interface FinancialChartProps {
 const FinancialChartInner: React.FC<FinancialChartProps> = ({
   candles,
   macdData,
-  macd15Data = [],
   priceLines,
   trades,
   currentPrice,
@@ -51,12 +49,10 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const mainChartContainerRef = useRef<HTMLDivElement>(null);
   const macd1mChartContainerRef = useRef<HTMLDivElement>(null);
-  const macd15mChartContainerRef = useRef<HTMLDivElement>(null);
 
   // Chart instances
   const mainChartRef = useRef<any>(null);
   const macd1mChartRef = useRef<any>(null);
-  const macd15mChartRef = useRef<any>(null);
 
   // 1-min MACD series
   const candleSeriesRef = useRef<any>(null);
@@ -68,10 +64,6 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
   const macdLineSeriesRef = useRef<any>(null);
   const signalLineSeriesRef = useRef<any>(null);
 
-  // 15-min MTF MACD series
-  const mtfMacdLineSeriesRef = useRef<any>(null);
-  const mtfSignalLineSeriesRef = useRef<any>(null);
-
   // Drawing
   const priceLinesRef = useRef<Map<number, any>>(new Map());
   // Trade SL/TP lines
@@ -82,7 +74,7 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
 
   // Initialization
   useEffect(() => {
-    if (!mainChartContainerRef.current || !macd1mChartContainerRef.current || !macd15mChartContainerRef.current) return;
+    if (!mainChartContainerRef.current || !macd1mChartContainerRef.current) return;
 
     // @ts-ignore
     if (!window.LightweightCharts) {
@@ -154,26 +146,8 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
       visible: isMacdVisible,
     });
 
-    // ── 15-min MTF MACD chart ─────────────────────────────────────────
-    const macd15mChart = createChart(macd15mChartContainerRef.current, {
-      ...commonOptions,
-      width: macd15mChartContainerRef.current.clientWidth,
-      height: macd15mChartContainerRef.current.clientHeight,
-    });
-
-    const mtfMacdLineSeries = macd15mChart.addSeries(LineSeries, {
-      color: '#3b82f6',   // blue — matches TradingView screenshot
-      lineWidth: 2,
-      visible: isMacdVisible,
-    });
-    const mtfSignalLineSeries = macd15mChart.addSeries(LineSeries, {
-      color: '#f97316',   // orange — matches TradingView screenshot
-      lineWidth: 2,
-      visible: isMacdVisible,
-    });
-
-    // ── 3-way time-scale sync ─────────────────────────────────────────
-    const charts = [mainChart, macd1mChart, macd15mChart];
+    // ── 2-way time-scale sync ─────────────────────────────────────────
+    const charts = [mainChart, macd1mChart];
     let isSyncing = false;
     charts.forEach((source, si) => {
       source.timeScale().subscribeVisibleLogicalRangeChange((range: any) => {
@@ -184,7 +158,7 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
       });
     });
 
-    // ── 3-way crosshair sync ──────────────────────────────────────────
+    // ── 2-way crosshair sync ──────────────────────────────────────────
     const syncCrosshair = (source: any, targets: { chart: any; series: any }[]) => {
       source.subscribeCrosshairMove((param: any) => {
         targets.forEach(({ chart, series }) => {
@@ -193,14 +167,12 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
         });
       });
     };
-    syncCrosshair(mainChart, [{ chart: macd1mChart, series: histogramSeries }, { chart: macd15mChart, series: mtfMacdLineSeries }]);
-    syncCrosshair(macd1mChart, [{ chart: mainChart, series: candleSeries }, { chart: macd15mChart, series: mtfMacdLineSeries }]);
-    syncCrosshair(macd15mChart, [{ chart: mainChart, series: candleSeries }, { chart: macd1mChart, series: histogramSeries }]);
+    syncCrosshair(mainChart, [{ chart: macd1mChart, series: histogramSeries }]);
+    syncCrosshair(macd1mChart, [{ chart: mainChart, series: candleSeries }]);
 
     // Store refs
     mainChartRef.current = mainChart;
     macd1mChartRef.current = macd1mChart;
-    macd15mChartRef.current = macd15mChart;
     candleSeriesRef.current = candleSeries;
     emaSeriesRef.current = emaSeries;
     hma2SeriesRef.current = hma2Series;
@@ -209,14 +181,11 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     histogramSeriesRef.current = histogramSeries;
     macdLineSeriesRef.current = macdLineSeries;
     signalLineSeriesRef.current = signalLineSeries;
-    mtfMacdLineSeriesRef.current = mtfMacdLineSeries;
-    mtfSignalLineSeriesRef.current = mtfSignalLineSeries;
 
     // Resize handler
     const handleResize = () => {
       if (mainChartContainerRef.current) mainChart.applyOptions({ width: mainChartContainerRef.current.clientWidth, height: mainChartContainerRef.current.clientHeight });
       if (macd1mChartContainerRef.current) macd1mChart.applyOptions({ width: macd1mChartContainerRef.current.clientWidth, height: macd1mChartContainerRef.current.clientHeight });
-      if (macd15mChartContainerRef.current) macd15mChart.applyOptions({ width: macd15mChartContainerRef.current.clientWidth, height: macd15mChartContainerRef.current.clientHeight });
     };
     window.addEventListener('resize', handleResize);
 
@@ -224,7 +193,6 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
       window.removeEventListener('resize', handleResize);
       mainChart.remove();
       macd1mChart.remove();
-      macd15mChart.remove();
     };
   }, []);
 
@@ -254,8 +222,6 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     if (histogramSeriesRef.current) histogramSeriesRef.current.applyOptions({ visible: isMacdVisible });
     if (macdLineSeriesRef.current) macdLineSeriesRef.current.applyOptions({ visible: isMacdVisible });
     if (signalLineSeriesRef.current) signalLineSeriesRef.current.applyOptions({ visible: isMacdVisible });
-    if (mtfMacdLineSeriesRef.current) mtfMacdLineSeriesRef.current.applyOptions({ visible: isMacdVisible });
-    if (mtfSignalLineSeriesRef.current) mtfSignalLineSeriesRef.current.applyOptions({ visible: isMacdVisible });
   }, [isEma1Visible, isHma2Visible, isHmaVisible, isMacdVisible]);
 
   // Cursor / crosshair mode
@@ -286,11 +252,6 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
       if (macdLineSeriesRef.current) macdLineSeriesRef.current.setData(macdData.map(d => ({ time: d.time, value: d.macd })));
       if (signalLineSeriesRef.current) signalLineSeriesRef.current.setData(macdData.map(d => ({ time: d.time, value: d.signal })));
 
-      // 15-min MTF MACD
-      if (macd15Data.length > 0) {
-        if (mtfMacdLineSeriesRef.current) mtfMacdLineSeriesRef.current.setData(macd15Data.map(d => ({ time: d.time, value: d.macd })));
-        if (mtfSignalLineSeriesRef.current) mtfSignalLineSeriesRef.current.setData(macd15Data.map(d => ({ time: d.time, value: d.signal })));
-      }
     } else {
       // New candle appended OR last candle ticked — use update() for all series
       const lastCandle = candles[candles.length - 1];
@@ -309,16 +270,10 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
         if (signalLineSeriesRef.current) signalLineSeriesRef.current.update({ time: lastMacd.time, value: lastMacd.signal });
       }
 
-      // 15-min MTF MACD
-      if (macd15Data.length > 0) {
-        const lastMtf = macd15Data[macd15Data.length - 1];
-        if (mtfMacdLineSeriesRef.current) mtfMacdLineSeriesRef.current.update({ time: lastMtf.time, value: lastMtf.macd });
-        if (mtfSignalLineSeriesRef.current) mtfSignalLineSeriesRef.current.update({ time: lastMtf.time, value: lastMtf.signal });
-      }
     }
 
     lastCandleLengthRef.current = candles.length;
-  }, [candles, macdData, macd15Data, emaData, hma2Data, hmaData, hmaBandData]);
+  }, [candles, macdData, emaData, hma2Data, hmaData, hmaBandData]);
 
   // Price lines
   useEffect(() => {
@@ -426,18 +381,6 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
         </div>
       </div>
 
-      {/* Pane 3: 15-min MTF MACD */}
-      <div className="relative h-[22%] min-h-[100px] bg-slate-800/50">
-        <div ref={macd15mChartContainerRef} className="w-full h-full" />
-        <div className="absolute top-2 left-3 z-10 text-[10px] font-bold pointer-events-none uppercase tracking-widest flex items-center gap-1.5">
-          <span className="text-slate-400">MACD MTF</span>
-          <span className="text-slate-500">{macdConfig.fast} {macdConfig.slow} {macdConfig.signal}</span>
-          <span className="text-slate-600">close</span>
-          <span className="text-orange-400/80">15</span>
-          <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-          <span className="w-2 h-2 rounded-full bg-orange-500 inline-block" />
-        </div>
-      </div>
 
     </div>
   );
@@ -454,7 +397,6 @@ export const FinancialChart = React.memo(FinancialChartInner, (prev, next) => {
   if (prev.trades !== next.trades) return false;
   if (prev.priceLines !== next.priceLines) return false;
   if (prev.macdData !== next.macdData) return false;
-  if (prev.macd15Data !== next.macd15Data) return false;
   if (prev.emaData !== next.emaData) return false;
   if (prev.hma2Data !== next.hma2Data) return false;
   if (prev.hmaData !== next.hmaData) return false;

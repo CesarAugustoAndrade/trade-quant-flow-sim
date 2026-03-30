@@ -56,3 +56,8 @@ High-fidelity market simulator with multiple stochastic engines and real-time te
 
 ## MCP Servers
 - Notion (user-level)
+
+## Agent Model Policy
+- When implementing a plan (plan mode approved → execution), use **Sonnet 4.6** agents for the implementation work
+- Same applies to `/dev-task` Phase 5 (Implement): spawn Sonnet 4.6 agents for coding
+- Opus stays in the driver seat for planning, review, and coordination

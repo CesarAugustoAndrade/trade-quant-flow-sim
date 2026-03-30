@@ -7,7 +7,7 @@ import { StreamingMACD, StreamingEMA, StreamingHMA, StreamingATR } from './servi
 import { SimulationMenu } from './components/SimulationMenu';
 import { SimulatorView } from './components/SimulatorView';
 import { SimulatorViewV2 } from './components/SimulatorViewV2';
-import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, SimulationType, MarketPreset, MARKET_PRESETS, SessionStats } from './types';
+import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, SimulationType, MarketPreset, MARKET_PRESETS, SessionStats, MacdDashboardData } from './types';
 
 const CANDLE_TIME_STEP = 60;
 
@@ -26,6 +26,101 @@ const getMacdColor = (current: number, previous: number) => {
     return current < previous ? '#ef5350' : '#ffcdd2';
   }
 };
+
+function computeMacdDashboard(
+  last15Macd: { macd: number; signal: number; histogram: number },
+  prev15Macd: { macd: number; signal: number; histogram: number },
+  ema1h35: number,
+  ema1h115: number,
+  atr: number,
+  macd15Bars: Array<{ close: number; macd: number }>,
+  macdSettings: { fast: number; slow: number; signal: number },
+  atrPeriod: number,
+): MacdDashboardData {
+  const ema1hTrend: MacdDashboardData['ema1hTrend'] = ema1h35 > ema1h115 ? 'BULLISH' : 'BEARISH';
+  const macdVsZero = last15Macd.macd;
+  const macdVsSignal = last15Macd.macd - last15Macd.signal;
+  const histogramRising = last15Macd.histogram > prev15Macd.histogram;
+
+  // Divergence detection on closed 15m bars (price vs MACD)
+  const pivotLen = 5;
+  const divLookback = 200;
+  let bullDiv = false;
+  let bearDiv = false;
+
+  if (macd15Bars.length > pivotLen * 2 + 2) {
+    // Find pivot lows and highs for BOTH price and MACD
+    const priceLows: { idx: number; val: number }[] = [];
+    const priceHighs: { idx: number; val: number }[] = [];
+    const macdLows: { idx: number; val: number }[] = [];
+    const macdHighs: { idx: number; val: number }[] = [];
+
+    for (let i = pivotLen; i < macd15Bars.length - pivotLen; i++) {
+      let isPriceLow = true, isPriceHigh = true;
+      let isMacdLow = true, isMacdHigh = true;
+      for (let j = 1; j <= pivotLen; j++) {
+        const bar = macd15Bars[i], barL = macd15Bars[i - j], barR = macd15Bars[i + j];
+        if (bar.close >= barL.close || bar.close >= barR.close) isPriceLow = false;
+        if (bar.close <= barL.close || bar.close <= barR.close) isPriceHigh = false;
+        if (bar.macd >= barL.macd || bar.macd >= barR.macd) isMacdLow = false;
+        if (bar.macd <= barL.macd || bar.macd <= barR.macd) isMacdHigh = false;
+      }
+      if (isPriceLow) priceLows.push({ idx: i, val: macd15Bars[i].close });
+      if (isPriceHigh) priceHighs.push({ idx: i, val: macd15Bars[i].close });
+      if (isMacdLow) macdLows.push({ idx: i, val: macd15Bars[i].macd });
+      if (isMacdHigh) macdHighs.push({ idx: i, val: macd15Bars[i].macd });
+    }
+
+    // Bullish divergence: price lower low + MACD higher low (within lookback)
+    if (priceLows.length >= 2 && macdLows.length >= 2) {
+      const pl1 = priceLows[priceLows.length - 2], pl2 = priceLows[priceLows.length - 1];
+      const ml1 = macdLows[macdLows.length - 2], ml2 = macdLows[macdLows.length - 1];
+      if (pl2.val < pl1.val && ml2.val > ml1.val &&
+          Math.max(pl2.idx, ml2.idx) - Math.min(pl1.idx, ml1.idx) <= divLookback) {
+        bullDiv = true;
+      }
+    }
+
+    // Bearish divergence: price higher high + MACD lower high (within lookback)
+    if (priceHighs.length >= 2 && macdHighs.length >= 2) {
+      const ph1 = priceHighs[priceHighs.length - 2], ph2 = priceHighs[priceHighs.length - 1];
+      const mh1 = macdHighs[macdHighs.length - 2], mh2 = macdHighs[macdHighs.length - 1];
+      if (ph2.val > ph1.val && mh2.val < mh1.val &&
+          Math.max(ph2.idx, mh2.idx) - Math.min(ph1.idx, mh1.idx) <= divLookback) {
+        bearDiv = true;
+      }
+    }
+  }
+
+  const divergence: MacdDashboardData['divergence'] =
+    bullDiv && bearDiv ? 'BULL + BEAR' : bullDiv ? 'BULLISH' : bearDiv ? 'BEARISH' : 'None';
+
+  // Drift score
+  const hourlyBullish = ema1h35 > ema1h115;
+  const wMacdVsSignal = 0.40;
+  const wMacdVsZero = 0.25;
+  const wHistogram = 0.10;
+  const wHourlyTrend = 0.25;
+  const wDivergence = 0.20;
+
+  const driftSignal = macdVsSignal >= 0 ? wMacdVsSignal : -wMacdVsSignal;
+  const driftZero = macdVsZero >= 0 ? wMacdVsZero : -wMacdVsZero;
+  const driftHist = histogramRising ? wHistogram : -wHistogram;
+  const driftHourly = hourlyBullish ? wHourlyTrend : -wHourlyTrend;
+  const driftDiv = bullDiv ? wDivergence : bearDiv ? -wDivergence : 0;
+
+  const driftScore = driftSignal + driftZero + driftHist + driftHourly + driftDiv;
+  const driftPct = driftScore * 100;
+
+  const driftLabel = driftScore > 0.5 ? 'STRONG BULL' : driftScore > 0.15 ? 'LEAN BULL' : driftScore > -0.15 ? 'NEUTRAL' : driftScore > -0.5 ? 'LEAN BEAR' : 'STRONG BEAR';
+  const driftColor = driftScore > 0.5 ? '#00ff00' : driftScore > 0.15 ? '#90ee90' : driftScore > -0.15 ? '#facc15' : driftScore > -0.5 ? '#ff6666' : '#ff0000';
+
+  return {
+    ema1hTrend, macdVsZero, macdVsSignal, histogramRising, divergence, atr,
+    driftLabel, driftPct, driftColor,
+    macdParams: macdSettings, ema1hParams: { fast: 35, slow: 115 }, atrPeriod,
+  };
+}
 
 export default function App() {
   // --- Navigation State ---
@@ -58,6 +153,11 @@ export default function App() {
   const [atrPeriod, setAtrPeriod] = useState(14);
   const [isAtrEnabled, setIsAtrEnabled] = useState(false);
   const [currentAtr, setCurrentAtr] = useState(0);
+  const [macdDashboard, setMacdDashboard] = useState<MacdDashboardData>({
+    ema1hTrend: 'BEARISH', macdVsZero: 0, macdVsSignal: 0, histogramRising: false,
+    divergence: 'None', atr: 0, driftLabel: 'NEUTRAL', driftPct: 0, driftColor: '#facc15',
+    macdParams: { fast: 35, slow: 115, signal: 18 }, ema1hParams: { fast: 35, slow: 115 }, atrPeriod: 14,
+  });
 
   // --- Trading State ---
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -106,7 +206,16 @@ export default function App() {
   // 15-min MACD state tracking
   const macd15CountRef = useRef(0); // counts 1-min candles within current 15-min window
   const last15MacdRef = useRef({ macd: 0, signal: 0, histogram: 0 });
+  const prev15MacdRef = useRef({ macd: 0, signal: 0, histogram: 0 });
   const mtfCandleBufferRef = useRef<Array<{open: number; high: number; low: number; close: number}>>([]);
+  const macd15BarsRef = useRef<Array<{ close: number; macd: number }>>([]);  // closed 15m bars for divergence
+  // 1H EMA state tracking
+  const ema1h35Ref = useRef<StreamingEMA | null>(null);
+  const ema1h115Ref = useRef<StreamingEMA | null>(null);
+  const ema1hCountRef = useRef(0); // counts 1-min candles for 60-candle aggregation
+  const ema1h35ValRef = useRef(0);
+  const ema1h115ValRef = useRef(0);
+  const hourCandleBufferRef = useRef<number[]>([]); // stores close prices for 60-candle agg
 
   // --- State Refs for hot path ---
   const configRef = useRef(config);
@@ -187,15 +296,24 @@ export default function App() {
     let count15 = 0;
     let last15 = { macd: 0, signal: 0, histogram: 0 };
     const new15MacdData: MacdData[] = [];
+    const new15Bars: Array<{ close: number; macd: number }> = [];
+    let buf15Close: number[] = [];
     currentCandles.forEach(c => {
       count15++;
-      if (count15 >= 15) { count15 = 0; last15 = new15MacdEngine.next(c.close); }
+      buf15Close.push(c.close);
+      if (count15 >= 15) {
+        count15 = 0;
+        last15 = new15MacdEngine.next(c.close);
+        new15Bars.push({ close: c.close, macd: last15.macd });
+        buf15Close = [];
+      }
       const prevHist = new15MacdData.length > 0 ? new15MacdData[new15MacdData.length - 1].value : 0;
       new15MacdData.push({ time: c.time, value: last15.histogram, color: getMacdColor(last15.histogram, prevHist), signal: last15.signal, macd: last15.macd });
     });
     macd15EngineRef.current = new15MacdEngine;
     macd15CountRef.current = count15;
     last15MacdRef.current = last15;
+    macd15BarsRef.current = new15Bars;
     setMacd15Data(new15MacdData);
 
     setEmaData(newEmaData);
@@ -215,6 +333,33 @@ export default function App() {
     });
     setCurrentAtr(lastAtrVal);
     atrEngineRef.current = newAtrEngine;
+
+    // Replay 1H EMA
+    const new1h35Engine = new StreamingEMA(35);
+    const new1h115Engine = new StreamingEMA(115);
+    let ema1h35Val = 0, ema1h115Val = 0;
+    let hourCount = 0;
+    currentCandles.forEach(c => {
+      hourCount++;
+      if (hourCount >= 60) {
+        hourCount = 0;
+        ema1h35Val = new1h35Engine.next(c.close);
+        ema1h115Val = new1h115Engine.next(c.close);
+      }
+    });
+    ema1h35Ref.current = new1h35Engine;
+    ema1h115Ref.current = new1h115Engine;
+    ema1hCountRef.current = hourCount;
+    ema1h35ValRef.current = ema1h35Val;
+    ema1h115ValRef.current = ema1h115Val;
+    hourCandleBufferRef.current = [];
+
+    // Compute dashboard
+    setMacdDashboard(computeMacdDashboard(
+      last15, { macd: 0, signal: 0, histogram: 0 },
+      ema1h35Val, ema1h115Val,
+      lastAtrVal, new15Bars, macdSettings, atrPeriod,
+    ));
   }, [emaPeriod, hma2Period, hmaPeriod, macdSettings, atrPeriod]);
 
   // --- Helpers ---
@@ -292,7 +437,15 @@ export default function App() {
     macd15EngineRef.current = new StreamingMACD(macdSettings.fast, macdSettings.slow, macdSettings.signal);
     macd15CountRef.current = 0;
     last15MacdRef.current = { macd: 0, signal: 0, histogram: 0 };
+    prev15MacdRef.current = { macd: 0, signal: 0, histogram: 0 };
     mtfCandleBufferRef.current = [];
+    macd15BarsRef.current = [];
+    ema1h35Ref.current = new StreamingEMA(35);
+    ema1h115Ref.current = new StreamingEMA(115);
+    ema1hCountRef.current = 0;
+    ema1h35ValRef.current = 0;
+    ema1h115ValRef.current = 0;
+    hourCandleBufferRef.current = [];
     emaEngineRef.current = new StreamingEMA(emaPeriod);
     hma2EngineRef.current = new StreamingHMA(hma2Period);
     hmaEngineRef.current = new StreamingHMA(hmaPeriod);
@@ -411,9 +564,23 @@ export default function App() {
             low: Math.min(...buf.map(c => c.low)),
             close: buf[14].close,
           };
+          prev15MacdRef.current = { ...last15MacdRef.current };
           current15Macd = macd15EngineRef.current.next(agg.close);
           last15MacdRef.current = current15Macd;
           mtfCandleBufferRef.current = [];
+          // Track closed 15m bar for divergence (close + MACD)
+          const bars15 = macd15BarsRef.current;
+          bars15.push({ close: agg.close, macd: current15Macd.macd });
+          if (bars15.length > 300) bars15.shift();
+        }
+
+        // 1H EMA aggregation (60 1-min candles)
+        hourCandleBufferRef.current.push(newCandle.close);
+        if (hourCandleBufferRef.current.length >= 60) {
+          const hourClose = hourCandleBufferRef.current[hourCandleBufferRef.current.length - 1];
+          if (ema1h35Ref.current) ema1h35ValRef.current = ema1h35Ref.current.next(hourClose);
+          if (ema1h115Ref.current) ema1h115ValRef.current = ema1h115Ref.current.next(hourClose);
+          hourCandleBufferRef.current = [];
         }
 
         const newMacd = macdEngineRef.current.next(newCandle.close);
@@ -461,6 +628,17 @@ export default function App() {
           const prevHist = prev.length > 0 ? prev[prev.length - 1].value : 0;
           const next = [...prev, { time: newCandle.time, value: current15Macd.histogram, color: getMacdColor(current15Macd.histogram, prevHist), signal: current15Macd.signal, macd: current15Macd.macd }];
           if (next.length > 2000) next.shift();
+          // Compute dashboard with latest data
+          setMacdDashboard(computeMacdDashboard(
+            last15MacdRef.current,
+            prev15MacdRef.current,
+            ema1h35ValRef.current,
+            ema1h115ValRef.current,
+            currentAtrRef.current,
+            macd15BarsRef.current,
+            macdSettings,
+            atrPeriod,
+          ));
           return next;
         });
         setHmaData(prevHma => {
@@ -744,7 +922,7 @@ export default function App() {
         <SimulatorViewV2
           candles={candles}
           macdData={macdData}
-          macd15Data={macd15Data}
+
           emaData={emaData}
           hma2Data={hma2Data}
           hmaData={hmaData}
@@ -818,12 +996,13 @@ export default function App() {
           onAtrPeriodChange={setAtrPeriod}
           onAtrEnabledChange={setIsAtrEnabled}
           sessionStats={sessionStats}
+          macdDashboard={macdDashboard}
         />
       ) : (
         <SimulatorView
           candles={candles}
           macdData={macdData}
-          macd15Data={macd15Data}
+
           emaData={emaData}
           hma2Data={hma2Data}
           hmaData={hmaData}
@@ -897,6 +1076,7 @@ export default function App() {
           onAtrPeriodChange={setAtrPeriod}
           onAtrEnabledChange={setIsAtrEnabled}
           sessionStats={sessionStats}
+          macdDashboard={macdDashboard}
         />
       )}
     </div>

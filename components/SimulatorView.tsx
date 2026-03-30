@@ -2,7 +2,7 @@ import React from 'react';
 import { FinancialChart } from './FinancialChart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { TradeDetailsModal } from './TradeDetailsModal';
-import { CandleData, MacdData, Trade, TradeType, MarketConfig, SimulationType, SessionStats } from '../types';
+import { CandleData, MacdData, Trade, TradeType, MarketConfig, SimulationType, SessionStats, MacdDashboardData } from '../types';
 
 // Icons
 const PlayIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
@@ -32,7 +32,6 @@ export interface SimulatorViewProps {
   // Chart data
   candles: CandleData[];
   macdData: MacdData[];
-  macd15Data: MacdData[];
   emaData: { time: number; value: number }[];
   hma2Data: { time: number; value: number }[];
   hmaData: { time: number; value: number }[];
@@ -118,11 +117,12 @@ export interface SimulatorViewProps {
   onAtrPeriodChange: (p: number) => void;
   onAtrEnabledChange: (v: boolean) => void;
   sessionStats: SessionStats;
+  macdDashboard: MacdDashboardData;
 }
 
 export function SimulatorView(props: SimulatorViewProps) {
   const {
-    candles, macdData, macd15Data, emaData, hma2Data, hmaData, hmaBandData, priceLines, trades, pnl, selectedTrade,
+    candles, macdData, emaData, hma2Data, hmaData, hmaBandData, priceLines, trades, pnl, selectedTrade,
     config, macdSettings, emaPeriod, hma2Period, hmaPeriod, emaColor, hma2Color, hmaColor,
     isEma1Visible, isHma2Visible, isHmaVisible, isMacdVisible, slPoints, tpPoints, pipSize, pipValue,
     isPlaying, isAutoMode, isBlindMode, isDrawingMode, currentSessionLabel,
@@ -703,7 +703,6 @@ export function SimulatorView(props: SimulatorViewProps) {
             <FinancialChart
               candles={candles}
               macdData={macdData}
-              macd15Data={macd15Data}
               currentPrice={currentPrice}
               priceLines={priceLines}
               emaData={emaData}

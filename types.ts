@@ -61,6 +61,21 @@ export interface SessionStats {
   avgDurationMinutes: number;
 }
 
+export interface MacdDashboardData {
+  ema1hTrend: 'BULLISH' | 'BEARISH';
+  macdVsZero: number;
+  macdVsSignal: number;
+  histogramRising: boolean;
+  divergence: 'BULLISH' | 'BEARISH' | 'BULL + BEAR' | 'None';
+  atr: number;
+  driftLabel: string;
+  driftPct: number;
+  driftColor: string;
+  macdParams: { fast: number; slow: number; signal: number };
+  ema1hParams: { fast: number; slow: number };
+  atrPeriod: number;
+}
+
 export interface MarketConfig {
   volatility: number;
   drift: number;

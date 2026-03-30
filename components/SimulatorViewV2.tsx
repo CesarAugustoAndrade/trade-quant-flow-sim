@@ -3,7 +3,7 @@ import { FinancialChart } from './FinancialChart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { TradeDetailsModal } from './TradeDetailsModal';
 import { SimulatorViewProps } from './SimulatorView';
-import { TradeType, SimulationType } from '../types';
+import { TradeType, SimulationType, MacdDashboardData } from '../types';
 import { ToastNotification, ToastMessage } from './ToastNotification';
 
 // --- TradingView Color Palette ---
@@ -62,9 +62,60 @@ function TBtn({ active, onClick, children, title, className = '' }: { active?: b
   );
 }
 
+function MacdDashboardPanel({ data }: { data: MacdDashboardData }) {
+  const hdr = '#0f3460';
+  const lbl = '#1a1a2e';
+  const row = '#16213e';
+  const txtL = '#8899aa';
+  const g = '#00ff00';
+  const r = '#ff0000';
+  return (
+    <div className="shrink-0 flex" style={{ background: '#0a0a1a', borderTop: '1px solid #363a45', height: '140px' }}>
+      <table className="flex-1 text-[10px] font-mono" style={{ borderCollapse: 'collapse' }}>
+        <tbody>
+          <tr>
+            <td colSpan={2} className="px-3 py-0.5 text-center font-bold tracking-wider" style={{ background: hdr, color: '#fff', fontSize: '9px' }}>
+              MACD DASHBOARD ({data.macdParams.fast}/{data.macdParams.slow}/{data.macdParams.signal})
+            </td>
+          </tr>
+          <tr>
+            <td className="px-3" style={{ background: lbl, color: txtL, width: '50%' }}>1H EMA {data.ema1hParams.fast} vs {data.ema1hParams.slow}</td>
+            <td className="px-3 text-right font-bold" style={{ background: row, color: data.ema1hTrend === 'BULLISH' ? g : r }}>{data.ema1hTrend}</td>
+          </tr>
+          <tr>
+            <td className="px-3" style={{ background: lbl, color: txtL }}>MACD vs Zero</td>
+            <td className="px-3 text-right" style={{ background: row, color: data.macdVsZero >= 0 ? g : r }}>{data.macdVsZero.toFixed(4)}</td>
+          </tr>
+          <tr>
+            <td className="px-3" style={{ background: lbl, color: txtL }}>MACD vs Signal</td>
+            <td className="px-3 text-right" style={{ background: row, color: data.macdVsSignal >= 0 ? g : r }}>{data.macdVsSignal.toFixed(4)}</td>
+          </tr>
+          <tr>
+            <td className="px-3" style={{ background: lbl, color: txtL }}>Histogram</td>
+            <td className="px-3 text-right font-bold" style={{ background: row, color: data.histogramRising ? g : r }}>{data.histogramRising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}</td>
+          </tr>
+          <tr>
+            <td className="px-3" style={{ background: lbl, color: txtL }}>Divergence (200 bars)</td>
+            <td className="px-3 text-right" style={{ background: row, color: data.divergence === 'None' ? '#666' : data.divergence.includes('BULL') ? g : r }}>{data.divergence}</td>
+          </tr>
+          <tr>
+            <td className="px-3" style={{ background: lbl, color: txtL }}>ATR ({data.atrPeriod}) — Chart TF</td>
+            <td className="px-3 text-right" style={{ background: row, color: '#00d2ff' }}>{data.atr.toFixed(5)}</td>
+          </tr>
+          <tr><td colSpan={2} style={{ background: hdr, height: '1px' }} /></tr>
+          <tr>
+            <td className="px-3 py-1 font-bold" style={{ background: hdr, color: '#fff', fontSize: '12px' }}>DRIFT</td>
+            <td className="px-3 py-1 text-right font-bold" style={{ background: '#0a0a1a', color: data.driftColor, fontSize: '12px' }}>{data.driftLabel}  {data.driftPct.toFixed(1)}%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function SimulatorViewV2(props: SimulatorViewProps) {
   const {
-    candles, macdData, macd15Data, emaData, hma2Data, hmaData, hmaBandData, priceLines, trades, pnl, selectedTrade,
+    candles, macdData, emaData, hma2Data, hmaData, hmaBandData, priceLines, trades, pnl, selectedTrade,
     config, macdSettings, emaPeriod, hma2Period, hmaPeriod, emaColor, hma2Color, hmaColor,
     isEma1Visible, isHma2Visible, isHmaVisible, isMacdVisible, slPoints, tpPoints, pipSize, pipValue,
     isPlaying, isAutoMode, isBlindMode, isDrawingMode, currentSessionLabel,
@@ -351,7 +402,6 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
               <FinancialChart
                 candles={candles}
                 macdData={macdData}
-                macd15Data={macd15Data}
                 currentPrice={currentPrice}
                 priceLines={priceLines}
                 emaData={emaData}
@@ -755,6 +805,11 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
       </div>
 
       <ToastNotification messages={toasts} onDismiss={dismissToast} />
+
+      {/* ========== MACD DASHBOARD ========== */}
+      {props.macdDashboard && (
+        <MacdDashboardPanel data={props.macdDashboard} />
+      )}
 
       {/* ========== BOTTOM PANEL ========== */}
       <div className="shrink-0 border-t" style={{ borderColor: TV.border, background: TV.panel }}>
