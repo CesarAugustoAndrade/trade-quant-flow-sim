@@ -7,7 +7,7 @@ import { StreamingMACD, StreamingEMA, StreamingHMA, StreamingATR, StreamingUltim
 import { SimulationMenu } from './components/SimulationMenu';
 import { SimulatorView } from './components/SimulatorView';
 import { SimulatorViewV2 } from './components/SimulatorViewV2';
-import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, SimulationType, MarketPreset, MARKET_PRESETS, SessionStats, MacdDashboardData, RsiDashboardData } from './types';
+import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, SimulationType, MarketPreset, MARKET_PRESETS, SessionStats, MacdDashboardData, RsiDashboardData, RsiChartData } from './types';
 
 const CANDLE_TIME_STEP = 60;
 
@@ -149,7 +149,7 @@ export default function App() {
   const [hmaColor, setHmaColor] = useState('#a855f7');
   const [isHmaVisible, setIsHmaVisible] = useState(false);
   const [macdSettings, setMacdSettings] = useState({ fast: 35, slow: 115, signal: 18 });
-  const [isMacdVisible, setIsMacdVisible] = useState(true);
+  const [subChartMode, setSubChartMode] = useState<'macd' | 'rsi'>('macd');
   const [atrPeriod, setAtrPeriod] = useState(14);
   const [isAtrEnabled, setIsAtrEnabled] = useState(true);
   const [currentAtr, setCurrentAtr] = useState(0);
@@ -161,6 +161,7 @@ export default function App() {
   const [rsiDashboard, setRsiDashboard] = useState<RsiDashboardData>({
     rsi: 50, signal: 50, zone: 'NEUTRAL', length: 14, signalLength: 14,
   });
+  const [rsiChartData, setRsiChartData] = useState<RsiChartData[]>([]);
 
   // --- Trading State ---
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -341,13 +342,18 @@ export default function App() {
     // Replay RSI
     const newRsiEngine = new StreamingUltimateRSI(14, 14);
     let lastRsi = { rsi: 50, signal: 50 };
-    currentCandles.forEach(c => { lastRsi = newRsiEngine.next(c.close); });
+    const newRsiChartData: RsiChartData[] = [];
+    currentCandles.forEach(c => {
+      lastRsi = newRsiEngine.next(c.close);
+      newRsiChartData.push({ time: c.time, rsi: lastRsi.rsi, signal: lastRsi.signal });
+    });
     rsiEngineRef.current = newRsiEngine;
     setRsiDashboard({
       rsi: lastRsi.rsi, signal: lastRsi.signal,
       zone: lastRsi.rsi > 80 ? 'OVERBOUGHT' : lastRsi.rsi < 20 ? 'OVERSOLD' : 'NEUTRAL',
       length: 14, signalLength: 14,
     });
+    setRsiChartData(newRsiChartData);
 
     // Replay 1H EMA
     const new1h35Engine = new StreamingEMA(35);
@@ -487,6 +493,7 @@ export default function App() {
     setTrades([]);
     setPriceLines([]);
     setMacd15Data([]);
+    setRsiChartData([]);
     setIsPlaying(false);
     setCurrentSessionLabel('RESET');
     setCurrentGarchSigma(p.volatility);
@@ -613,6 +620,11 @@ export default function App() {
             rsi: rsiVal.rsi, signal: rsiVal.signal,
             zone: rsiVal.rsi > 80 ? 'OVERBOUGHT' : rsiVal.rsi < 20 ? 'OVERSOLD' : 'NEUTRAL',
             length: 14, signalLength: 14,
+          });
+          setRsiChartData(prev => {
+            const next = [...prev, { time: newCandle.time, rsi: rsiVal.rsi, signal: rsiVal.signal }];
+            if (next.length > 2000) next.shift();
+            return next;
           });
         }
 
@@ -964,7 +976,7 @@ export default function App() {
           isEma1Visible={isEma1Visible}
           isHma2Visible={isHma2Visible}
           isHmaVisible={isHmaVisible}
-          isMacdVisible={isMacdVisible}
+          subChartMode={subChartMode}
           slPoints={slPoints}
           tpPoints={tpPoints}
           pipSize={pipSize}
@@ -999,7 +1011,7 @@ export default function App() {
           onEma1VisibleChange={setIsEma1Visible}
           onHma2VisibleChange={setIsHma2Visible}
           onHmaVisibleChange={setIsHmaVisible}
-          onMacdVisibleChange={setIsMacdVisible}
+          onSubChartModeChange={setSubChartMode}
           onSlPointsChange={setSlPoints}
           onTpPointsChange={setTpPoints}
           onPipValueChange={setPipValue}
@@ -1020,6 +1032,7 @@ export default function App() {
           sessionStats={sessionStats}
           macdDashboard={macdDashboard}
           rsiDashboard={rsiDashboard}
+          rsiChartData={rsiChartData}
         />
       ) : (
         <SimulatorView
@@ -1045,7 +1058,7 @@ export default function App() {
           isEma1Visible={isEma1Visible}
           isHma2Visible={isHma2Visible}
           isHmaVisible={isHmaVisible}
-          isMacdVisible={isMacdVisible}
+          subChartMode={subChartMode}
           slPoints={slPoints}
           tpPoints={tpPoints}
           pipSize={pipSize}
@@ -1080,7 +1093,7 @@ export default function App() {
           onEma1VisibleChange={setIsEma1Visible}
           onHma2VisibleChange={setIsHma2Visible}
           onHmaVisibleChange={setIsHmaVisible}
-          onMacdVisibleChange={setIsMacdVisible}
+          onSubChartModeChange={setSubChartMode}
           onSlPointsChange={setSlPoints}
           onTpPointsChange={setTpPoints}
           onPipValueChange={setPipValue}
@@ -1101,6 +1114,7 @@ export default function App() {
           sessionStats={sessionStats}
           macdDashboard={macdDashboard}
           rsiDashboard={rsiDashboard}
+          rsiChartData={rsiChartData}
         />
       )}
     </div>

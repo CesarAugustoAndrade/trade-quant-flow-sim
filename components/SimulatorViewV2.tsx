@@ -188,14 +188,14 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
   const {
     candles, macdData, emaData, hma2Data, hmaData, hmaBandData, priceLines, trades, pnl, selectedTrade,
     config, macdSettings, emaPeriod, hma2Period, hmaPeriod, emaColor, hma2Color, hmaColor,
-    isEma1Visible, isHma2Visible, isHmaVisible, isMacdVisible, slPoints, tpPoints, pipSize, pipValue,
+    isEma1Visible, isHma2Visible, isHmaVisible, rsiChartData, subChartMode, slPoints, tpPoints, pipSize, pipValue,
     isPlaying, isAutoMode, isBlindMode, isDrawingMode, currentSessionLabel,
     selectedSim, momentumParams, ouParams, garchParams, currentGarchSigma,
     currentPrice, currentTimeDisplay, pricePrecision,
     onReturnToMenu, onReset, onTogglePlay, onToggleAutoMode, onToggleBlindMode, onToggleDrawingMode,
     onConfigChange, onMacdSettingsChange, onEmaPeriodChange, onHma2PeriodChange, onHmaPeriodChange,
     onEmaColorChange, onHma2ColorChange, onHmaColorChange,
-    onEma1VisibleChange, onHma2VisibleChange, onHmaVisibleChange, onMacdVisibleChange,
+    onEma1VisibleChange, onHma2VisibleChange, onHmaVisibleChange, onSubChartModeChange,
     onSlPointsChange, onTpPointsChange, onPipValueChange,
     onTrade, onCloseTrade, onSelectTrade, onChartClick, onRemoveLine, onDownloadCSV,
     onMomentumParamsChange, onOuParamsChange, onGarchParamsChange,
@@ -203,6 +203,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
     sessionStats,
   } = props;
 
+  const isMacdVisible = subChartMode === 'macd';
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'history' | 'journal'>('positions');
   const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
@@ -301,7 +302,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
           <TBtn onClick={() => onHmaVisibleChange(!isHmaVisible)} active={isHmaVisible} title="Toggle HMA">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: hmaColor }} />HMA</span>
           </TBtn>
-          <TBtn onClick={() => onMacdVisibleChange(!isMacdVisible)} active={isMacdVisible} title="Toggle MACD">MACD</TBtn>
+          <TBtn onClick={() => onSubChartModeChange(subChartMode === 'macd' ? 'rsi' : 'macd')} active={true} title="Toggle MACD / RSI">{subChartMode === 'macd' ? 'MACD' : 'RSI'}</TBtn>
           <TBtn onClick={() => onAtrEnabledChange(!isAtrEnabled)} active={isAtrEnabled} title="ATR-based SL/TP (3×SL, 6×TP)">
             <span className="flex items-center gap-1">
               ATR
@@ -413,7 +414,8 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
                 isEma1Visible={isEma1Visible}
                 isHma2Visible={isHma2Visible}
                 isHmaVisible={isHmaVisible}
-                isMacdVisible={isMacdVisible}
+                rsiChartData={rsiChartData}
+                subChartMode={subChartMode}
                 pricePrecision={pricePrecision}
                 onChartClick={onChartClick}
               />
@@ -601,8 +603,8 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
                 {/* MACD */}
                 <div className="pt-2 border-t" style={{ borderColor: TV.border }}>
                   <div className="flex items-center gap-2 mb-2">
-                    <button onClick={() => onMacdVisibleChange(!isMacdVisible)} style={{ color: TV.textMuted }}>{isMacdVisible ? <EyeIcon /> : <EyeOffIcon />}</button>
-                    <span className="text-[11px]" style={{ color: TV.textSec }}>MACD ({macdSettings.fast}, {macdSettings.slow}, {macdSettings.signal})</span>
+                    <button onClick={() => onSubChartModeChange(subChartMode === 'macd' ? 'rsi' : 'macd')} style={{ color: TV.textMuted }}>{subChartMode === 'macd' ? <EyeIcon /> : <EyeOffIcon />}</button>
+                    <span className="text-[11px]" style={{ color: TV.textSec }}>Sub-chart: {subChartMode === 'macd' ? `MACD (${macdSettings.fast}, ${macdSettings.slow}, ${macdSettings.signal})` : 'RSI (14, 14)'}</span>
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     {(['fast', 'slow', 'signal'] as const).map(key => (

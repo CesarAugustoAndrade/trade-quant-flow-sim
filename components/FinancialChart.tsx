@@ -15,7 +15,8 @@ interface FinancialChartProps {
   isEma1Visible: boolean;
   isHma2Visible: boolean;
   isHmaVisible: boolean;
-  isMacdVisible: boolean;
+  rsiChartData?: { time: number; rsi: number; signal: number }[];
+  subChartMode?: 'macd' | 'rsi';
   macdConfig?: { fast: number; slow: number; signal: number };
   emaColor?: string;
   hma2Color?: string;
@@ -38,7 +39,8 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
   isEma1Visible,
   isHma2Visible,
   isHmaVisible,
-  isMacdVisible,
+  rsiChartData = [],
+  subChartMode = 'macd',
   macdConfig = { fast: 35, slow: 115, signal: 18 },
   emaColor = '#facc15',
   hma2Color = '#06b6d4',
@@ -64,6 +66,12 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
   const macdLineSeriesRef = useRef<any>(null);
   const signalLineSeriesRef = useRef<any>(null);
 
+  // RSI chart
+  const rsiChartContainerRef = useRef<HTMLDivElement>(null);
+  const rsiChartRef = useRef<any>(null);
+  const rsiLineSeriesRef = useRef<any>(null);
+  const rsiSignalSeriesRef = useRef<any>(null);
+
   // Drawing
   const priceLinesRef = useRef<Map<number, any>>(new Map());
   // Trade SL/TP lines
@@ -74,7 +82,7 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
 
   // Initialization
   useEffect(() => {
-    if (!mainChartContainerRef.current || !macd1mChartContainerRef.current) return;
+    if (!mainChartContainerRef.current || !macd1mChartContainerRef.current || !rsiChartContainerRef.current) return;
 
     // @ts-ignore
     if (!window.LightweightCharts) {
@@ -133,21 +141,53 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     const histogramSeries = macd1mChart.addSeries(HistogramSeries, {
       color: '#26a69a',
       priceFormat: { type: 'volume' },
-      visible: isMacdVisible,
+      visible: subChartMode === 'macd',
     });
     const macdLineSeries = macd1mChart.addSeries(LineSeries, {
       color: '#3b82f6',
       lineWidth: 1,
-      visible: isMacdVisible,
+      visible: subChartMode === 'macd',
     });
     const signalLineSeries = macd1mChart.addSeries(LineSeries, {
       color: '#f59e0b',
       lineWidth: 1,
-      visible: isMacdVisible,
+      visible: subChartMode === 'macd',
     });
 
+    // ── RSI chart ─────────────────────────────────────────────────────
+    const rsiChart = createChart(rsiChartContainerRef.current, {
+      ...commonOptions,
+      width: rsiChartContainerRef.current.clientWidth,
+      height: rsiChartContainerRef.current.clientHeight,
+    });
+
+    // RSI line
+    const rsiLineSeries = rsiChart.addSeries(LineSeries, {
+      color: '#d1d4dc',
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: true,
+    });
+
+    // Signal line
+    const rsiSignalSeries = rsiChart.addSeries(LineSeries, {
+      color: '#ff5d00',
+      lineWidth: 1,
+      priceLineVisible: false,
+      lastValueVisible: true,
+    });
+
+    // OB/OS/Mid levels
+    rsiLineSeries.createPriceLine({ price: 80, color: '#08998155', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' });
+    rsiLineSeries.createPriceLine({ price: 50, color: '#787b8644', lineWidth: 1, lineStyle: 2, axisLabelVisible: false, title: '' });
+    rsiLineSeries.createPriceLine({ price: 20, color: '#f2364555', lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: '' });
+
+    rsiChartRef.current = rsiChart;
+    rsiLineSeriesRef.current = rsiLineSeries;
+    rsiSignalSeriesRef.current = rsiSignalSeries;
+
     // ── 2-way time-scale sync ─────────────────────────────────────────
-    const charts = [mainChart, macd1mChart];
+    const charts = [mainChart, macd1mChart, rsiChart];
     let isSyncing = false;
     charts.forEach((source, si) => {
       source.timeScale().subscribeVisibleLogicalRangeChange((range: any) => {
@@ -167,8 +207,9 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
         });
       });
     };
-    syncCrosshair(mainChart, [{ chart: macd1mChart, series: histogramSeries }]);
-    syncCrosshair(macd1mChart, [{ chart: mainChart, series: candleSeries }]);
+    syncCrosshair(mainChart, [{ chart: macd1mChart, series: histogramSeries }, { chart: rsiChart, series: rsiLineSeries }]);
+    syncCrosshair(macd1mChart, [{ chart: mainChart, series: candleSeries }, { chart: rsiChart, series: rsiLineSeries }]);
+    syncCrosshair(rsiChart, [{ chart: mainChart, series: candleSeries }, { chart: macd1mChart, series: histogramSeries }]);
 
     // Store refs
     mainChartRef.current = mainChart;
@@ -186,6 +227,7 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     const handleResize = () => {
       if (mainChartContainerRef.current) mainChart.applyOptions({ width: mainChartContainerRef.current.clientWidth, height: mainChartContainerRef.current.clientHeight });
       if (macd1mChartContainerRef.current) macd1mChart.applyOptions({ width: macd1mChartContainerRef.current.clientWidth, height: macd1mChartContainerRef.current.clientHeight });
+      if (rsiChartContainerRef.current) rsiChart.applyOptions({ width: rsiChartContainerRef.current.clientWidth, height: rsiChartContainerRef.current.clientHeight });
     };
     window.addEventListener('resize', handleResize);
 
@@ -193,6 +235,7 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
       window.removeEventListener('resize', handleResize);
       mainChart.remove();
       macd1mChart.remove();
+      rsiChart.remove();
     };
   }, []);
 
@@ -219,10 +262,18 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     if (hma2SeriesRef.current) hma2SeriesRef.current.applyOptions({ visible: isHma2Visible });
     if (hmaSeriesRef.current) hmaSeriesRef.current.applyOptions({ visible: isHmaVisible });
     if (hmaBandSeriesRef.current) hmaBandSeriesRef.current.applyOptions({ visible: isHmaVisible });
-    if (histogramSeriesRef.current) histogramSeriesRef.current.applyOptions({ visible: isMacdVisible });
-    if (macdLineSeriesRef.current) macdLineSeriesRef.current.applyOptions({ visible: isMacdVisible });
-    if (signalLineSeriesRef.current) signalLineSeriesRef.current.applyOptions({ visible: isMacdVisible });
-  }, [isEma1Visible, isHma2Visible, isHmaVisible, isMacdVisible]);
+  }, [isEma1Visible, isHma2Visible, isHmaVisible]);
+
+  // Sub-chart mode visibility (MACD / RSI)
+  useEffect(() => {
+    const showMacd = subChartMode === 'macd';
+    if (histogramSeriesRef.current) histogramSeriesRef.current.applyOptions({ visible: showMacd });
+    if (macdLineSeriesRef.current) macdLineSeriesRef.current.applyOptions({ visible: showMacd });
+    if (signalLineSeriesRef.current) signalLineSeriesRef.current.applyOptions({ visible: showMacd });
+    const showRsi = subChartMode === 'rsi';
+    if (rsiLineSeriesRef.current) rsiLineSeriesRef.current.applyOptions({ visible: showRsi });
+    if (rsiSignalSeriesRef.current) rsiSignalSeriesRef.current.applyOptions({ visible: showRsi });
+  }, [subChartMode]);
 
   // Cursor / crosshair mode
   useEffect(() => {
@@ -252,6 +303,12 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
       if (macdLineSeriesRef.current) macdLineSeriesRef.current.setData(macdData.map(d => ({ time: d.time, value: d.macd })));
       if (signalLineSeriesRef.current) signalLineSeriesRef.current.setData(macdData.map(d => ({ time: d.time, value: d.signal })));
 
+      // RSI
+      if (rsiChartData.length > 0) {
+        if (rsiLineSeriesRef.current) rsiLineSeriesRef.current.setData(rsiChartData.map(d => ({ time: d.time, value: d.rsi })));
+        if (rsiSignalSeriesRef.current) rsiSignalSeriesRef.current.setData(rsiChartData.map(d => ({ time: d.time, value: d.signal })));
+      }
+
     } else {
       // New candle appended OR last candle ticked — use update() for all series
       const lastCandle = candles[candles.length - 1];
@@ -270,10 +327,17 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
         if (signalLineSeriesRef.current) signalLineSeriesRef.current.update({ time: lastMacd.time, value: lastMacd.signal });
       }
 
+      // RSI
+      if (rsiChartData.length > 0) {
+        const lastRsi = rsiChartData[rsiChartData.length - 1];
+        if (rsiLineSeriesRef.current) rsiLineSeriesRef.current.update({ time: lastRsi.time, value: lastRsi.rsi });
+        if (rsiSignalSeriesRef.current) rsiSignalSeriesRef.current.update({ time: lastRsi.time, value: lastRsi.signal });
+      }
+
     }
 
     lastCandleLengthRef.current = candles.length;
-  }, [candles, macdData, emaData, hma2Data, hmaData, hmaBandData]);
+  }, [candles, macdData, emaData, hma2Data, hmaData, hmaBandData, rsiChartData]);
 
   // Price lines
   useEffect(() => {
@@ -369,15 +433,30 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
         )}
       </div>
 
-      {/* Pane 2: 1-min MACD */}
+      {/* Pane 2: Sub-chart (MACD or RSI) */}
       <div className="relative h-[22%] min-h-[100px] border-b border-slate-700 bg-slate-800/50">
-        <div ref={macd1mChartContainerRef} className="w-full h-full" />
+        {/* MACD container */}
+        <div ref={macd1mChartContainerRef} className="w-full h-full absolute inset-0" style={{ display: subChartMode === 'macd' ? 'block' : 'none' }} />
+        {/* RSI container */}
+        <div ref={rsiChartContainerRef} className="w-full h-full absolute inset-0" style={{ display: subChartMode === 'rsi' ? 'block' : 'none' }} />
+        {/* Label */}
         <div className="absolute top-2 left-3 z-10 text-[10px] font-bold pointer-events-none uppercase tracking-widest flex items-center gap-1.5">
-          <span className="text-slate-400">MACD</span>
-          <span className="text-slate-500">{macdConfig.fast} {macdConfig.slow}</span>
-          <span className="text-slate-600">close</span>
-          <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
-          <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+          {subChartMode === 'macd' ? (
+            <>
+              <span className="text-slate-400">MACD</span>
+              <span className="text-slate-500">{macdConfig.fast} {macdConfig.slow}</span>
+              <span className="text-slate-600">close</span>
+              <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
+              <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+            </>
+          ) : (
+            <>
+              <span className="text-slate-400">RSI</span>
+              <span className="text-slate-500">14 / 14</span>
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#d1d4dc' }} />
+              <span className="w-2 h-2 rounded-full inline-block" style={{ background: '#ff5d00' }} />
+            </>
+          )}
         </div>
       </div>
 
@@ -406,7 +485,8 @@ export const FinancialChart = React.memo(FinancialChartInner, (prev, next) => {
   if (prev.isEma1Visible !== next.isEma1Visible) return false;
   if (prev.isHma2Visible !== next.isHma2Visible) return false;
   if (prev.isHmaVisible !== next.isHmaVisible) return false;
-  if (prev.isMacdVisible !== next.isMacdVisible) return false;
+  if (prev.subChartMode !== next.subChartMode) return false;
+  if (prev.rsiChartData !== next.rsiChartData) return false;
   if (prev.emaColor !== next.emaColor) return false;
   if (prev.hma2Color !== next.hma2Color) return false;
   if (prev.hmaColor !== next.hmaColor) return false;

@@ -2,7 +2,7 @@ import React from 'react';
 import { FinancialChart } from './FinancialChart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { TradeDetailsModal } from './TradeDetailsModal';
-import { CandleData, MacdData, Trade, TradeType, MarketConfig, SimulationType, SessionStats, MacdDashboardData, RsiDashboardData } from '../types';
+import { CandleData, MacdData, Trade, TradeType, MarketConfig, SimulationType, SessionStats, MacdDashboardData, RsiDashboardData, RsiChartData } from '../types';
 
 // Icons
 const PlayIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
@@ -53,7 +53,8 @@ export interface SimulatorViewProps {
   isEma1Visible: boolean;
   isHma2Visible: boolean;
   isHmaVisible: boolean;
-  isMacdVisible: boolean;
+  rsiChartData: RsiChartData[];
+  subChartMode: 'macd' | 'rsi';
   slPoints: number;
   tpPoints: number;
   pipSize: number;
@@ -98,7 +99,7 @@ export interface SimulatorViewProps {
   onEma1VisibleChange: (v: boolean) => void;
   onHma2VisibleChange: (v: boolean) => void;
   onHmaVisibleChange: (v: boolean) => void;
-  onMacdVisibleChange: (v: boolean) => void;
+  onSubChartModeChange: (mode: 'macd' | 'rsi') => void;
   onSlPointsChange: (v: number) => void;
   onTpPointsChange: (v: number) => void;
   onPipValueChange: (v: number) => void;
@@ -125,19 +126,20 @@ export function SimulatorView(props: SimulatorViewProps) {
   const {
     candles, macdData, emaData, hma2Data, hmaData, hmaBandData, priceLines, trades, pnl, selectedTrade,
     config, macdSettings, emaPeriod, hma2Period, hmaPeriod, emaColor, hma2Color, hmaColor,
-    isEma1Visible, isHma2Visible, isHmaVisible, isMacdVisible, slPoints, tpPoints, pipSize, pipValue,
+    isEma1Visible, isHma2Visible, isHmaVisible, rsiChartData, subChartMode, slPoints, tpPoints, pipSize, pipValue,
     isPlaying, isAutoMode, isBlindMode, isDrawingMode, currentSessionLabel,
     selectedSim, momentumParams, ouParams, garchParams, currentGarchSigma,
     currentPrice, currentTimeDisplay, pricePrecision,
     onReturnToMenu, onReset, onTogglePlay, onToggleAutoMode, onToggleBlindMode, onToggleDrawingMode,
     onConfigChange, onMacdSettingsChange, onEmaPeriodChange, onHma2PeriodChange, onHmaPeriodChange,
     onEmaColorChange, onHma2ColorChange, onHmaColorChange,
-    onEma1VisibleChange, onHma2VisibleChange, onHmaVisibleChange, onMacdVisibleChange,
+    onEma1VisibleChange, onHma2VisibleChange, onHmaVisibleChange, onSubChartModeChange,
     onSlPointsChange, onTpPointsChange, onPipValueChange,
     onTrade, onCloseTrade, onSelectTrade, onChartClick, onRemoveLine, onDownloadCSV,
     onMomentumParamsChange, onOuParamsChange, onGarchParamsChange,
   } = props;
 
+  const isMacdVisible = subChartMode === 'macd';
   const garchAB = garchParams.alpha + garchParams.beta;
 
   return (
@@ -529,7 +531,7 @@ export function SimulatorView(props: SimulatorViewProps) {
             {/* MACD Settings */}
             <div className="space-y-2 mb-4 border-t border-slate-700 pt-4">
               <div className="flex items-center gap-2 mb-2">
-                <button onClick={() => onMacdVisibleChange(!isMacdVisible)} className="text-slate-500 hover:text-white transition-colors">
+                <button onClick={() => onSubChartModeChange(subChartMode === 'macd' ? 'rsi' : 'macd')} className="text-slate-500 hover:text-white transition-colors">
                   {isMacdVisible ? <EyeIcon /> : <EyeOffIcon />}
                 </button>
                 <label className="text-xs text-slate-500 block">MACD ({macdSettings.fast}, {macdSettings.slow}, {macdSettings.signal})</label>
@@ -719,7 +721,8 @@ export function SimulatorView(props: SimulatorViewProps) {
               isEma1Visible={isEma1Visible}
               isHma2Visible={isHma2Visible}
               isHmaVisible={isHmaVisible}
-              isMacdVisible={isMacdVisible}
+              rsiChartData={rsiChartData}
+              subChartMode={subChartMode}
               pricePrecision={pricePrecision}
               onChartClick={onChartClick}
             />

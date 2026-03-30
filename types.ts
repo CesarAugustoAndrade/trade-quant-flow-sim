@@ -69,6 +69,12 @@ export interface RsiDashboardData {
   signalLength: number;
 }
 
+export interface RsiChartData {
+  time: number;
+  rsi: number;
+  signal: number;
+}
+
 export interface MacdDashboardData {
   ema1hTrend: 'BULLISH' | 'BEARISH';
   macdVsZero: number;
