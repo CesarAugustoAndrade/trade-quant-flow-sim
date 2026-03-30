@@ -148,22 +148,22 @@ export const MARKET_PRESETS: Record<MarketPreset, MarketPresetConfig> = {
     label: 'EUR/USD',
     startPrice: 1.0850,
     volatility: 0.0003,
-    drift: 0.00001,
-    slPoints: 0.03,
-    tpPoints: 0,
+    drift: 0.000005,
+    slPoints: 0.0015,       // 15 pips — realistic intraday SL
+    tpPoints: 0.003,        // 30 pips — 2:1 R:R
     ouMeanLevel: 1.0850,
-    ouReversionSpeed: 0.005,
-    ouVolatility: 0.0008,
+    ouReversionSpeed: 0.008,
+    ouVolatility: 0.0003,   // ~3 pip noise per tick (was 0.0008 = 8 pips)
     momentumVolatility: 0.0003,
     momentumTrendStrength: 0.55,
-    momentumDrift: 0.00001,
+    momentumDrift: 0.000005,
     garchOmega: 0.0000001,
     garchAlpha: 0.08,
     garchBeta: 0.88,
-    garchDrift: 0.00001,
+    garchDrift: 0.000005,
     pricePrecision: 5,
     pipSize: 0.0001,
-    pipValue: 0.2,
+    pipValue: 1,            // $1 per pip (micro lot)
     spread: 0.00010,
   },
 };

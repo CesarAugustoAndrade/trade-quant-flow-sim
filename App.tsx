@@ -477,7 +477,7 @@ export default function App() {
     setCurrentGarchSigma(p.volatility);
 
     if (simType === SimulationType.GBM) {
-      setConfig(prev => ({ ...prev, volatility: preset === MarketPreset.EURUSD ? 0.0003 : 0.0015, drift: 0.0000 }));
+      setConfig(prev => ({ ...prev, volatility: p.volatility, drift: p.drift }));
     }
   };
 
