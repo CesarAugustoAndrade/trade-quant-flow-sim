@@ -773,8 +773,8 @@ export default function App() {
       const spread = MARKET_PRESETS[activePresetRef.current].spread ?? 0;
       const entryPrice = type === TradeType.LONG ? currentPrice + spread / 2 : currentPrice - spread / 2;
       const atrValHotkey = isAtrEnabledRef.current && currentAtrRef.current > 0 ? currentAtrRef.current : 0;
-      const effectiveSlHotkey = atrValHotkey > 0 ? (atrValHotkey / 10) * 3 : sl;
-      const effectiveTpHotkey = atrValHotkey > 0 ? (atrValHotkey / 10) * 9 : tp;
+      const effectiveSlHotkey = atrValHotkey > 0 ? atrValHotkey * 1.5 : sl;
+      const effectiveTpHotkey = atrValHotkey > 0 ? atrValHotkey * 3 : tp;
       const stopLossPrice = effectiveSlHotkey > 0 ? (type === TradeType.LONG ? entryPrice - effectiveSlHotkey : entryPrice + effectiveSlHotkey) : undefined;
       const takeProfitPrice = effectiveTpHotkey > 0 ? (type === TradeType.LONG ? entryPrice + effectiveTpHotkey : entryPrice - effectiveTpHotkey) : undefined;
       const snapshot = captureSnapshot(emaDataRef.current, hma2DataRef.current, hmaDataRef.current, macdDataRef.current);
@@ -815,8 +815,8 @@ export default function App() {
     const spread = MARKET_PRESETS[activePreset].spread ?? 0;
     const entryPrice = type === TradeType.LONG ? currentPrice + spread / 2 : currentPrice - spread / 2;
     const atrVal = isAtrEnabledRef.current && currentAtrRef.current > 0 ? currentAtrRef.current : 0;
-    const effectiveSl = atrVal > 0 ? (atrVal / 10) * 3 : slPoints;
-    const effectiveTp = atrVal > 0 ? (atrVal / 10) * 9 : tpPoints;
+    const effectiveSl = atrVal > 0 ? atrVal * 1.5 : slPoints;
+    const effectiveTp = atrVal > 0 ? atrVal * 3 : tpPoints;
     const stopLossPrice = effectiveSl > 0 ? (type === TradeType.LONG ? entryPrice - effectiveSl : entryPrice + effectiveSl) : undefined;
     const takeProfitPrice = effectiveTp > 0 ? (type === TradeType.LONG ? entryPrice + effectiveTp : entryPrice - effectiveTp) : undefined;
     const snapshot = captureSnapshot(emaData, hma2Data, hmaData, macdData);
