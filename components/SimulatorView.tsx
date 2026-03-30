@@ -703,7 +703,6 @@ export function SimulatorView(props: SimulatorViewProps) {
             <FinancialChart
               candles={candles}
               macdData={macdData}
-              macdDashboard={props.macdDashboard}
               currentPrice={currentPrice}
               priceLines={priceLines}
               emaData={emaData}

@@ -1,10 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { CandleData, MacdData, MacdDashboardData, Trade } from '../types';
+import { CandleData, MacdData, Trade } from '../types';
 
 interface FinancialChartProps {
   candles: CandleData[];
   macdData: MacdData[];
-  macdDashboard?: MacdDashboardData;
   priceLines: number[];
   trades: Trade[];
   currentPrice: number;
@@ -28,7 +27,6 @@ interface FinancialChartProps {
 const FinancialChartInner: React.FC<FinancialChartProps> = ({
   candles,
   macdData,
-  macdDashboard,
   priceLines,
   trades,
   currentPrice,
@@ -275,7 +273,7 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     }
 
     lastCandleLengthRef.current = candles.length;
-  }, [candles, macdData, macdDashboard, emaData, hma2Data, hmaData, hmaBandData]);
+  }, [candles, macdData, emaData, hma2Data, hmaData, hmaBandData]);
 
   // Price lines
   useEffect(() => {
@@ -383,81 +381,6 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
         </div>
       </div>
 
-      {/* Pane 3: MACD Dashboard */}
-      <div className="relative h-[22%] min-h-[100px] overflow-hidden" style={{ background: '#0a0a1a' }}>
-        {macdDashboard ? (
-          <div className="h-full flex flex-col text-[11px]" style={{ fontFamily: 'monospace' }}>
-            {/* Header */}
-            <div className="px-3 py-1 text-center font-bold tracking-wider" style={{ background: '#0f3460', color: '#fff', fontSize: '10px' }}>
-              MACD DASHBOARD ({macdDashboard.macdParams.fast}/{macdDashboard.macdParams.slow}/{macdDashboard.macdParams.signal})
-            </div>
-            {/* Rows */}
-            <div className="flex-1 overflow-hidden">
-              <table className="w-full h-full" style={{ borderCollapse: 'collapse' }}>
-                <tbody>
-                  {/* 1H EMA trend */}
-                  <tr>
-                    <td className="px-3 py-0.5" style={{ background: '#1a1a2e', color: '#8899aa', width: '55%' }}>
-                      1H EMA {macdDashboard.ema1hParams.fast} vs {macdDashboard.ema1hParams.slow}
-                    </td>
-                    <td className="px-3 py-0.5 text-right font-bold" style={{ background: '#16213e', color: macdDashboard.ema1hTrend === 'BULLISH' ? '#00ff00' : '#ff0000' }}>
-                      {macdDashboard.ema1hTrend}
-                    </td>
-                  </tr>
-                  {/* MACD vs Zero */}
-                  <tr>
-                    <td className="px-3 py-0.5" style={{ background: '#1a1a2e', color: '#8899aa' }}>MACD vs Zero</td>
-                    <td className="px-3 py-0.5 text-right" style={{ background: '#16213e', color: macdDashboard.macdVsZero >= 0 ? '#00ff00' : '#ff0000' }}>
-                      {macdDashboard.macdVsZero.toFixed(4)}
-                    </td>
-                  </tr>
-                  {/* MACD vs Signal */}
-                  <tr>
-                    <td className="px-3 py-0.5" style={{ background: '#1a1a2e', color: '#8899aa' }}>MACD vs Signal</td>
-                    <td className="px-3 py-0.5 text-right" style={{ background: '#16213e', color: macdDashboard.macdVsSignal >= 0 ? '#00ff00' : '#ff0000' }}>
-                      {macdDashboard.macdVsSignal.toFixed(4)}
-                    </td>
-                  </tr>
-                  {/* Histogram */}
-                  <tr>
-                    <td className="px-3 py-0.5" style={{ background: '#1a1a2e', color: '#8899aa' }}>Histogram</td>
-                    <td className="px-3 py-0.5 text-right font-bold" style={{ background: '#16213e', color: macdDashboard.histogramRising ? '#00ff00' : '#ff0000' }}>
-                      {macdDashboard.histogramRising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}
-                    </td>
-                  </tr>
-                  {/* Divergence */}
-                  <tr>
-                    <td className="px-3 py-0.5" style={{ background: '#1a1a2e', color: '#8899aa' }}>Divergence (200 bars)</td>
-                    <td className="px-3 py-0.5 text-right" style={{ background: '#16213e', color: macdDashboard.divergence === 'None' ? '#666' : macdDashboard.divergence.includes('BULL') ? '#00ff00' : '#ff0000' }}>
-                      {macdDashboard.divergence}
-                    </td>
-                  </tr>
-                  {/* ATR */}
-                  <tr>
-                    <td className="px-3 py-0.5" style={{ background: '#1a1a2e', color: '#8899aa' }}>ATR ({macdDashboard.atrPeriod}) — Chart TF</td>
-                    <td className="px-3 py-0.5 text-right" style={{ background: '#16213e', color: '#00d2ff' }}>
-                      {macdDashboard.atr.toFixed(5)}
-                    </td>
-                  </tr>
-                  {/* Separator */}
-                  <tr><td colSpan={2} style={{ background: '#0f3460', height: '2px' }} /></tr>
-                  {/* Drift */}
-                  <tr>
-                    <td className="px-3 py-1 font-bold" style={{ background: '#0f3460', color: '#fff', fontSize: '13px' }}>DRIFT</td>
-                    <td className="px-3 py-1 text-right font-bold" style={{ background: '#0a0a1a', color: macdDashboard.driftColor, fontSize: '13px' }}>
-                      {macdDashboard.driftLabel} {macdDashboard.driftPct.toFixed(1)}%
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-full text-xs" style={{ color: '#555' }}>
-            Waiting for data...
-          </div>
-        )}
-      </div>
 
     </div>
   );
@@ -474,7 +397,6 @@ export const FinancialChart = React.memo(FinancialChartInner, (prev, next) => {
   if (prev.trades !== next.trades) return false;
   if (prev.priceLines !== next.priceLines) return false;
   if (prev.macdData !== next.macdData) return false;
-  if (prev.macdDashboard !== next.macdDashboard) return false;
   if (prev.emaData !== next.emaData) return false;
   if (prev.hma2Data !== next.hma2Data) return false;
   if (prev.hmaData !== next.hmaData) return false;
