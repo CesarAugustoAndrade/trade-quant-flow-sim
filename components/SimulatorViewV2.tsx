@@ -302,7 +302,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: hmaColor }} />HMA</span>
           </TBtn>
           <TBtn onClick={() => onMacdVisibleChange(!isMacdVisible)} active={isMacdVisible} title="Toggle MACD">MACD</TBtn>
-          <TBtn onClick={() => onAtrEnabledChange(!isAtrEnabled)} active={isAtrEnabled} title="ATR-based SL/TP (1.5×SL, 3×TP)">
+          <TBtn onClick={() => onAtrEnabledChange(!isAtrEnabled)} active={isAtrEnabled} title="ATR-based SL/TP (3×SL, 6×TP)">
             <span className="flex items-center gap-1">
               ATR
               {isAtrEnabled && currentAtr > 0 && (
@@ -637,12 +637,12 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
                   {isAtrEnabled && currentAtr > 0 && (
                     <div className="mt-1 space-y-0.5 text-[10px]">
                       <div className="flex justify-between">
-                        <span style={{ color: TV.textMuted }}>SL (1.5×ATR)</span>
-                        <span className="font-mono" style={{ color: TV.red }}>{(currentAtr * 1.5).toFixed(5)}</span>
+                        <span style={{ color: TV.textMuted }}>SL (3×ATR)</span>
+                        <span className="font-mono" style={{ color: TV.red }}>{(currentAtr * 3).toFixed(5)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span style={{ color: TV.textMuted }}>TP (3×ATR)</span>
-                        <span className="font-mono" style={{ color: TV.green }}>{(currentAtr * 3).toFixed(5)}</span>
+                        <span style={{ color: TV.textMuted }}>TP (6×ATR)</span>
+                        <span className="font-mono" style={{ color: TV.green }}>{(currentAtr * 6).toFixed(5)}</span>
                       </div>
                     </div>
                   )}
@@ -733,8 +733,8 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
               <button
                 onClick={() => {
                   const atrEff = isAtrEnabled && currentAtr > 0 ? currentAtr : 0;
-                  const effSl = atrEff > 0 ? atrEff * 1.5 : slPoints;
-                  const effTp = atrEff > 0 ? atrEff * 3 : tpPoints;
+                  const effSl = atrEff > 0 ? atrEff * 3 : slPoints;
+                  const effTp = atrEff > 0 ? atrEff * 6 : tpPoints;
                   onTrade(TradeType.LONG);
                   addToast('trade-open', `\u2713 LONG @ ${currentPrice.toFixed(pricePrecision)}${effSl > 0 ? ` | SL: ${(currentPrice - effSl).toFixed(pricePrecision)}` : ''}${effTp > 0 ? ` | TP: ${(currentPrice + effTp).toFixed(pricePrecision)}` : ''}`);
                 }}
@@ -746,8 +746,8 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
               <button
                 onClick={() => {
                   const atrEff = isAtrEnabled && currentAtr > 0 ? currentAtr : 0;
-                  const effSl = atrEff > 0 ? atrEff * 1.5 : slPoints;
-                  const effTp = atrEff > 0 ? atrEff * 3 : tpPoints;
+                  const effSl = atrEff > 0 ? atrEff * 3 : slPoints;
+                  const effTp = atrEff > 0 ? atrEff * 6 : tpPoints;
                   onTrade(TradeType.SHORT);
                   addToast('trade-open', `\u2713 SHORT @ ${currentPrice.toFixed(pricePrecision)}${effSl > 0 ? ` | SL: ${(currentPrice + effSl).toFixed(pricePrecision)}` : ''}${effTp > 0 ? ` | TP: ${(currentPrice - effTp).toFixed(pricePrecision)}` : ''}`);
                 }}
