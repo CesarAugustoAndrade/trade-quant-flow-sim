@@ -207,7 +207,6 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
   const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'history' | 'journal'>('positions');
   const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [sidebarPanel, setSidebarPanel] = useState<'macd' | 'rsi'>('macd');
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastIdRef = useRef(0);
 
@@ -701,23 +700,11 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
 
         {/* ========== RIGHT SIDEBAR: Dashboard + Order Entry ========== */}
         <div className="shrink-0 border-l flex flex-col" style={{ width: '220px', borderColor: TV.border, background: '#0a0a1a' }}>
-          {/* Panel toggle */}
-          <div className="flex" style={{ borderBottom: `1px solid ${TV.border}` }}>
-            <button
-              onClick={() => setSidebarPanel('macd')}
-              className="flex-1 py-1 text-[9px] font-bold uppercase tracking-wider text-center transition-colors"
-              style={{ background: sidebarPanel === 'macd' ? '#0f3460' : '#0a0a1a', color: sidebarPanel === 'macd' ? '#fff' : '#555' }}
-            >MACD</button>
-            <button
-              onClick={() => setSidebarPanel('rsi')}
-              className="flex-1 py-1 text-[9px] font-bold uppercase tracking-wider text-center transition-colors"
-              style={{ background: sidebarPanel === 'rsi' ? '#0f3460' : '#0a0a1a', color: sidebarPanel === 'rsi' ? '#fff' : '#555' }}
-            >RSI</button>
-          </div>
+          {/* MACD Dashboard */}
+          {props.macdDashboard && <MacdDashboardPanel data={props.macdDashboard} />}
 
-          {/* Active panel */}
-          {sidebarPanel === 'macd' && props.macdDashboard && <MacdDashboardPanel data={props.macdDashboard} />}
-          {sidebarPanel === 'rsi' && props.rsiDashboard && <RsiDashboardPanel data={props.rsiDashboard} />}
+          {/* Ultimate RSI */}
+          {props.rsiDashboard && <RsiDashboardPanel data={props.rsiDashboard} />}
 
           {/* Spacer */}
           <div className="flex-1" />
