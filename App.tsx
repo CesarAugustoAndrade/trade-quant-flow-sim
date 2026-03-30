@@ -33,7 +33,7 @@ function computeMacdDashboard(
   ema1h35: number,
   ema1h115: number,
   atr: number,
-  macd15History: MacdData[],
+  macd15Bars: Array<{ close: number; macd: number }>,
   macdSettings: { fast: number; slow: number; signal: number },
   atrPeriod: number,
 ): MacdDashboardData {
@@ -42,55 +42,51 @@ function computeMacdDashboard(
   const macdVsSignal = last15Macd.macd - last15Macd.signal;
   const histogramRising = last15Macd.histogram > prev15Macd.histogram;
 
-  // Divergence detection from 15m MACD history
-  // Sample every 15th entry (these are the actual 15m bar closes)
+  // Divergence detection on closed 15m bars (price vs MACD)
   const pivotLen = 5;
   const divLookback = 200;
-  const macd15Bars: { macd: number; close: number }[] = [];
-  // The macd15History has one entry per 1-min candle but value only changes every 15
-  // Deduplicate by taking entries where macd changed
-  let lastMacd = NaN;
-  for (const d of macd15History) {
-    if (d.macd !== lastMacd) {
-      macd15Bars.push({ macd: d.macd, close: 0 }); // close not tracked separately in macd15Data
-      lastMacd = d.macd;
-    }
-  }
-
-  // Simple pivot detection on MACD values
   let bullDiv = false;
   let bearDiv = false;
 
   if (macd15Bars.length > pivotLen * 2 + 2) {
-    // Find pivot lows and highs in MACD
-    const lows: { idx: number; val: number }[] = [];
-    const highs: { idx: number; val: number }[] = [];
+    // Find pivot lows and highs for BOTH price and MACD
+    const priceLows: { idx: number; val: number }[] = [];
+    const priceHighs: { idx: number; val: number }[] = [];
+    const macdLows: { idx: number; val: number }[] = [];
+    const macdHighs: { idx: number; val: number }[] = [];
 
     for (let i = pivotLen; i < macd15Bars.length - pivotLen; i++) {
-      let isLow = true;
-      let isHigh = true;
+      let isPriceLow = true, isPriceHigh = true;
+      let isMacdLow = true, isMacdHigh = true;
       for (let j = 1; j <= pivotLen; j++) {
-        if (macd15Bars[i].macd >= macd15Bars[i - j].macd || macd15Bars[i].macd >= macd15Bars[i + j].macd) isLow = false;
-        if (macd15Bars[i].macd <= macd15Bars[i - j].macd || macd15Bars[i].macd <= macd15Bars[i + j].macd) isHigh = false;
+        const bar = macd15Bars[i], barL = macd15Bars[i - j], barR = macd15Bars[i + j];
+        if (bar.close >= barL.close || bar.close >= barR.close) isPriceLow = false;
+        if (bar.close <= barL.close || bar.close <= barR.close) isPriceHigh = false;
+        if (bar.macd >= barL.macd || bar.macd >= barR.macd) isMacdLow = false;
+        if (bar.macd <= barL.macd || bar.macd <= barR.macd) isMacdHigh = false;
       }
-      if (isLow) lows.push({ idx: i, val: macd15Bars[i].macd });
-      if (isHigh) highs.push({ idx: i, val: macd15Bars[i].macd });
+      if (isPriceLow) priceLows.push({ idx: i, val: macd15Bars[i].close });
+      if (isPriceHigh) priceHighs.push({ idx: i, val: macd15Bars[i].close });
+      if (isMacdLow) macdLows.push({ idx: i, val: macd15Bars[i].macd });
+      if (isMacdHigh) macdHighs.push({ idx: i, val: macd15Bars[i].macd });
     }
 
-    // Check last two pivot lows for bullish divergence (higher MACD low)
-    if (lows.length >= 2) {
-      const l1 = lows[lows.length - 2];
-      const l2 = lows[lows.length - 1];
-      if (l2.idx - l1.idx <= divLookback && l2.val > l1.val) {
+    // Bullish divergence: price lower low + MACD higher low (within lookback)
+    if (priceLows.length >= 2 && macdLows.length >= 2) {
+      const pl1 = priceLows[priceLows.length - 2], pl2 = priceLows[priceLows.length - 1];
+      const ml1 = macdLows[macdLows.length - 2], ml2 = macdLows[macdLows.length - 1];
+      if (pl2.val < pl1.val && ml2.val > ml1.val &&
+          Math.max(pl2.idx, ml2.idx) - Math.min(pl1.idx, ml1.idx) <= divLookback) {
         bullDiv = true;
       }
     }
 
-    // Check last two pivot highs for bearish divergence (lower MACD high)
-    if (highs.length >= 2) {
-      const h1 = highs[highs.length - 2];
-      const h2 = highs[highs.length - 1];
-      if (h2.idx - h1.idx <= divLookback && h2.val < h1.val) {
+    // Bearish divergence: price higher high + MACD lower high (within lookback)
+    if (priceHighs.length >= 2 && macdHighs.length >= 2) {
+      const ph1 = priceHighs[priceHighs.length - 2], ph2 = priceHighs[priceHighs.length - 1];
+      const mh1 = macdHighs[macdHighs.length - 2], mh2 = macdHighs[macdHighs.length - 1];
+      if (ph2.val > ph1.val && mh2.val < mh1.val &&
+          Math.max(ph2.idx, mh2.idx) - Math.min(ph1.idx, mh1.idx) <= divLookback) {
         bearDiv = true;
       }
     }
@@ -212,6 +208,7 @@ export default function App() {
   const last15MacdRef = useRef({ macd: 0, signal: 0, histogram: 0 });
   const prev15MacdRef = useRef({ macd: 0, signal: 0, histogram: 0 });
   const mtfCandleBufferRef = useRef<Array<{open: number; high: number; low: number; close: number}>>([]);
+  const macd15BarsRef = useRef<Array<{ close: number; macd: number }>>([]);  // closed 15m bars for divergence
   // 1H EMA state tracking
   const ema1h35Ref = useRef<StreamingEMA | null>(null);
   const ema1h115Ref = useRef<StreamingEMA | null>(null);
@@ -299,15 +296,24 @@ export default function App() {
     let count15 = 0;
     let last15 = { macd: 0, signal: 0, histogram: 0 };
     const new15MacdData: MacdData[] = [];
+    const new15Bars: Array<{ close: number; macd: number }> = [];
+    let buf15Close: number[] = [];
     currentCandles.forEach(c => {
       count15++;
-      if (count15 >= 15) { count15 = 0; last15 = new15MacdEngine.next(c.close); }
+      buf15Close.push(c.close);
+      if (count15 >= 15) {
+        count15 = 0;
+        last15 = new15MacdEngine.next(c.close);
+        new15Bars.push({ close: c.close, macd: last15.macd });
+        buf15Close = [];
+      }
       const prevHist = new15MacdData.length > 0 ? new15MacdData[new15MacdData.length - 1].value : 0;
       new15MacdData.push({ time: c.time, value: last15.histogram, color: getMacdColor(last15.histogram, prevHist), signal: last15.signal, macd: last15.macd });
     });
     macd15EngineRef.current = new15MacdEngine;
     macd15CountRef.current = count15;
     last15MacdRef.current = last15;
+    macd15BarsRef.current = new15Bars;
     setMacd15Data(new15MacdData);
 
     setEmaData(newEmaData);
@@ -352,7 +358,7 @@ export default function App() {
     setMacdDashboard(computeMacdDashboard(
       last15, { macd: 0, signal: 0, histogram: 0 },
       ema1h35Val, ema1h115Val,
-      lastAtrVal, new15MacdData, macdSettings, atrPeriod,
+      lastAtrVal, new15Bars, macdSettings, atrPeriod,
     ));
   }, [emaPeriod, hma2Period, hmaPeriod, macdSettings, atrPeriod]);
 
@@ -433,6 +439,7 @@ export default function App() {
     last15MacdRef.current = { macd: 0, signal: 0, histogram: 0 };
     prev15MacdRef.current = { macd: 0, signal: 0, histogram: 0 };
     mtfCandleBufferRef.current = [];
+    macd15BarsRef.current = [];
     ema1h35Ref.current = new StreamingEMA(35);
     ema1h115Ref.current = new StreamingEMA(115);
     ema1hCountRef.current = 0;
@@ -561,6 +568,10 @@ export default function App() {
           current15Macd = macd15EngineRef.current.next(agg.close);
           last15MacdRef.current = current15Macd;
           mtfCandleBufferRef.current = [];
+          // Track closed 15m bar for divergence (close + MACD)
+          const bars15 = macd15BarsRef.current;
+          bars15.push({ close: agg.close, macd: current15Macd.macd });
+          if (bars15.length > 300) bars15.shift();
         }
 
         // 1H EMA aggregation (60 1-min candles)
@@ -624,7 +635,7 @@ export default function App() {
             ema1h35ValRef.current,
             ema1h115ValRef.current,
             currentAtrRef.current,
-            next,
+            macd15BarsRef.current,
             macdSettings,
             atrPeriod,
           ));
