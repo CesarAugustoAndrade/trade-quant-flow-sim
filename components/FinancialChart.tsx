@@ -436,9 +436,9 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
       {/* Pane 2: Sub-chart (MACD or RSI) */}
       <div className="relative h-[22%] min-h-[100px] border-b border-slate-700 bg-slate-800/50">
         {/* MACD container */}
-        <div ref={macd1mChartContainerRef} className="w-full h-full absolute inset-0" style={{ display: subChartMode === 'macd' ? 'block' : 'none' }} />
+        <div ref={macd1mChartContainerRef} className="w-full h-full absolute inset-0" style={{ visibility: subChartMode === 'macd' ? 'visible' : 'hidden' }} />
         {/* RSI container */}
-        <div ref={rsiChartContainerRef} className="w-full h-full absolute inset-0" style={{ display: subChartMode === 'rsi' ? 'block' : 'none' }} />
+        <div ref={rsiChartContainerRef} className="w-full h-full absolute inset-0" style={{ visibility: subChartMode === 'rsi' ? 'visible' : 'hidden' }} />
         {/* Label */}
         <div className="absolute top-2 left-3 z-10 text-[10px] font-bold pointer-events-none uppercase tracking-widest flex items-center gap-1.5">
           {subChartMode === 'macd' ? (
