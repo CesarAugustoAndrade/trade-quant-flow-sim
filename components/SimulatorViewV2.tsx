@@ -3,7 +3,7 @@ import { FinancialChart } from './FinancialChart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { TradeDetailsModal } from './TradeDetailsModal';
 import { SimulatorViewProps } from './SimulatorView';
-import { TradeType, SimulationType, MacdDashboardData, RsiDashboardData } from '../types';
+import { TradeType, SimulationType, MacdDashboardData } from '../types';
 import { ToastNotification, ToastMessage } from './ToastNotification';
 
 // --- TradingView Color Palette ---
@@ -76,110 +76,87 @@ function MacdDashboardPanel({ data }: { data: MacdDashboardData }) {
   const lbl = '#1a1a2e';
   const row = '#16213e';
   const txtL = '#8899aa';
-  const g = '#089981';
-  const r = '#f23645';
+  const g = '#00ff00';
+  const r = '#ff0000';
+  const rsiSuffix = data.rsi15 > 70 ? '  OB' : data.rsi15 < 30 ? '  OS' : '';
   return (
     <div className="flex flex-col text-[10px] font-mono" style={{ background: '#0a0a1a' }}>
       {/* Header */}
       <div className="px-2 py-1 text-center font-bold tracking-wider" style={{ background: hdr, color: '#fff', fontSize: '9px' }}>
-        MACD DASHBOARD <span style={{ color: '#8899aa', fontWeight: 'normal' }}>{data.macdParams.fast}/{data.macdParams.slow}/{data.macdParams.signal}</span>
+        MACD DASHBOARD <span style={{ color: '#8899aa', fontWeight: 'normal' }}>
+          (15m: {data.macdParams.fast}/{data.macdParams.slow}/{data.macdParams.signal})
+        </span>{' '}
+        <span style={{ color: '#00d2ff' }}>◉</span> CLOSED
       </div>
 
-      {/* Rows */}
-      <DashRow label={`1H EMA ${data.ema1hParams.fast}/${data.ema1hParams.slow}`} lbl={lbl} row={row} txtL={txtL}>
+      {/* Row 1 — Daily Bias */}
+      <DashRow label="Daily Bias" lbl={lbl} row={row} txtL={txtL}>
+        <span className="font-bold" style={{ color: data.dailyBiasColor }}>{data.dailyBiasText}</span>
+      </DashRow>
+
+      {/* Row 2 — 1H EMA trend */}
+      <DashRow label={`1H EMA ${data.ema1hParams.fast} vs ${data.ema1hParams.slow}`} lbl={lbl} row={row} txtL={txtL}>
         <span className="font-bold" style={{ color: data.ema1hTrend === 'BULLISH' ? g : r }}>{data.ema1hTrend}</span>
       </DashRow>
+
+      {/* Row 3 — MACD vs Zero */}
       <DashRow label="MACD vs Zero" lbl={lbl} row={row} txtL={txtL}>
-        <span style={{ color: data.macdVsZero >= 0 ? g : r }}>{data.macdVsZero.toFixed(4)}</span>
+        <span style={{ color: data.macdVsZero >= 0 ? g : r }}>{data.macdVsZero.toFixed(5)}</span>
       </DashRow>
+
+      {/* Row 4 — MACD vs Signal */}
       <DashRow label="MACD vs Signal" lbl={lbl} row={row} txtL={txtL}>
-        <span style={{ color: data.macdVsSignal >= 0 ? g : r }}>{data.macdVsSignal.toFixed(4)}</span>
+        <span style={{ color: data.macdVsSignal >= 0 ? g : r }}>{data.macdVsSignal.toFixed(5)}</span>
       </DashRow>
+
+      {/* Row 5 — Histogram */}
       <DashRow label="Histogram" lbl={lbl} row={row} txtL={txtL}>
-        <span className="font-bold" style={{ color: data.histogramRising ? g : r }}>{data.histogramRising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}</span>
+        <span className="font-bold" style={{ color: data.histogramRising ? g : r }}>
+          {data.histogramRising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}
+        </span>
       </DashRow>
-      <DashRow label="Divergence" lbl={lbl} row={row} txtL={txtL}>
-        <span style={{ color: data.divergence === 'None' ? '#666' : data.divergence.includes('BULL') ? g : r }}>{data.divergence}</span>
+
+      {/* Row 6 — RSI Divergence */}
+      <DashRow label="RSI Divergence (200 bars)" lbl={lbl} row={row} txtL={txtL}>
+        <span style={{ color: data.divergence === 'None' ? '#888' : data.divergence.includes('BULL') ? g : r }}>
+          {data.divergence}
+        </span>
       </DashRow>
-      <DashRow label={`ATR (${data.atrPeriod})`} lbl={lbl} row={row} txtL={txtL}>
+
+      {/* Row 7 — RSI (15m) */}
+      <DashRow label={`RSI (${data.rsiLen}) — 15m`} lbl={lbl} row={row} txtL={txtL}>
+        <span style={{ color: data.rsiColor }}>{data.rsi15.toFixed(2)}{rsiSuffix}</span>
+      </DashRow>
+
+      {/* Row 8 — 5m Histogram */}
+      <DashRow label="Histogram — 5m" lbl={lbl} row={row} txtL={txtL}>
+        <span className="font-bold" style={{ color: data.hist5Rising ? g : r }}>
+          {data.hist5Rising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}
+        </span>
+      </DashRow>
+
+      {/* Row 9 — 3m Histogram */}
+      <DashRow label="Histogram — 3m" lbl={lbl} row={row} txtL={txtL}>
+        <span className="font-bold" style={{ color: data.hist3Rising ? g : r }}>
+          {data.hist3Rising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}
+        </span>
+      </DashRow>
+
+      {/* Row 10 — ATR */}
+      <DashRow label={`ATR (${data.atrPeriod}) — Chart TF`} lbl={lbl} row={row} txtL={txtL}>
         <span style={{ color: '#00d2ff' }}>{data.atr.toFixed(5)}</span>
       </DashRow>
 
-      {/* Drift Score — compact */}
-      <div className="flex items-center justify-between px-2 py-1.5" style={{ background: hdr, borderTop: '1px solid #363a45' }}>
-        <span className="text-[9px] uppercase" style={{ color: '#8899aa' }}>DRIFT</span>
-        <span className="font-bold" style={{ color: data.driftColor, fontSize: '11px' }}>{data.driftLabel} {data.driftPct.toFixed(1)}%</span>
-      </div>
-    </div>
-  );
-}
+      {/* Separator */}
+      <div style={{ height: '2px', background: hdr }} />
 
-function RsiDashboardPanel({ data }: { data: RsiDashboardData }) {
-  const ob = '#089981';
-  const os = '#f23645';
-  const neutral = '#8899aa';
-  const rsiColor = data.rsi > 80 ? ob : data.rsi < 20 ? os : neutral;
-  const signalColor = '#ff5d00';
-  const bgBar = '#1a1a2e';
-
-  // RSI bar fill width (0-100 mapped to percentage)
-  const fillPct = Math.max(0, Math.min(100, data.rsi));
-
-  return (
-    <div className="flex flex-col text-[10px] font-mono" style={{ background: '#0a0a1a' }}>
-      {/* Header */}
-      <div className="px-2 py-1 text-center font-bold tracking-wider" style={{ background: '#0f3460', color: '#fff', fontSize: '9px' }}>
-        ULTIMATE RSI <span style={{ color: '#8899aa', fontWeight: 'normal' }}>{data.length}/{data.signalLength}</span>
-      </div>
-
-      {/* RSI Value — large */}
-      <div className="px-3 py-3 text-center" style={{ background: '#0a0a1a' }}>
-        <div className="text-[22px] font-bold" style={{ color: rsiColor }}>
-          {data.rsi.toFixed(1)}
-        </div>
-        <div className="text-[9px] mt-0.5 uppercase tracking-wider" style={{ color: rsiColor }}>
-          {data.zone}
-        </div>
-      </div>
-
-      {/* RSI Bar */}
-      <div className="mx-2 mb-2 rounded-full overflow-hidden" style={{ height: '6px', background: '#16213e' }}>
-        <div
-          className="h-full rounded-full transition-all duration-300"
-          style={{
-            width: `${fillPct}%`,
-            background: data.rsi > 80 ? ob : data.rsi < 20 ? os : `linear-gradient(90deg, ${os}, ${neutral}, ${ob})`,
-          }}
-        />
-      </div>
-
-      {/* Levels */}
-      <div className="flex justify-between px-2 text-[8px] mb-2" style={{ color: '#555' }}>
-        <span>0</span>
-        <span style={{ color: os }}>20</span>
-        <span>50</span>
-        <span style={{ color: ob }}>80</span>
-        <span>100</span>
-      </div>
-
-      {/* Signal line */}
-      <DashRow label="Signal" lbl={bgBar} row="#16213e" txtL="#8899aa">
-        <span style={{ color: signalColor }}>{data.signal.toFixed(1)}</span>
-      </DashRow>
-
-      {/* RSI vs Signal */}
-      <DashRow label="RSI vs Signal" lbl={bgBar} row="#16213e" txtL="#8899aa">
-        <span style={{ color: data.rsi > data.signal ? ob : os }}>
-          {data.rsi > data.signal ? '\u25b2 ABOVE' : '\u25bc BELOW'}
+      {/* Drift Score */}
+      <div className="flex items-center justify-between px-2 py-2" style={{ background: hdr }}>
+        <span className="font-bold uppercase" style={{ color: '#fff', fontSize: '11px' }}>DRIFT</span>
+        <span className="font-bold" style={{ color: data.driftColor, fontSize: '11px' }}>
+          {data.driftLabel}  {data.driftPct.toFixed(1)}%
         </span>
-      </DashRow>
-
-      {/* Distance from midline */}
-      <DashRow label="vs Midline (50)" lbl={bgBar} row="#16213e" txtL="#8899aa">
-        <span style={{ color: data.rsi > 50 ? ob : os }}>
-          {(data.rsi - 50).toFixed(1)}
-        </span>
-      </DashRow>
+      </div>
     </div>
   );
 }
@@ -296,11 +273,11 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
           <TBtn onClick={() => onEma1VisibleChange(!isEma1Visible)} active={isEma1Visible} title="Toggle EMA">
             <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: emaColor }} />EMA</span>
           </TBtn>
-          <TBtn onClick={() => onHma2VisibleChange(!isHma2Visible)} active={isHma2Visible} title="Toggle HMA 2">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: hma2Color }} />HMA2</span>
+          <TBtn onClick={() => onHma2VisibleChange(!isHma2Visible)} active={isHma2Visible} title="Toggle EMA 2">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: hma2Color }} />EMA2</span>
           </TBtn>
-          <TBtn onClick={() => onHmaVisibleChange(!isHmaVisible)} active={isHmaVisible} title="Toggle HMA">
-            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: hmaColor }} />HMA</span>
+          <TBtn onClick={() => onHmaVisibleChange(!isHmaVisible)} active={isHmaVisible} title="Toggle EMA 3">
+            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full" style={{ background: hmaColor }} />EMA3</span>
           </TBtn>
           <TBtn onClick={() => onSubChartModeChange(subChartMode === 'macd' ? 'rsi' : 'macd')} active={true} title="Toggle MACD / RSI">{subChartMode === 'macd' ? 'MACD' : 'RSI'}</TBtn>
           <TBtn onClick={() => onAtrEnabledChange(!isAtrEnabled)} active={isAtrEnabled} title="ATR-based SL/TP (3×SL, 6×TP)">
@@ -584,18 +561,18 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
                   <input type="number" min="5" max="200" value={emaPeriod} onChange={(e) => onEmaPeriodChange(parseInt(e.target.value) || 1)}
                     className="w-12 text-xs font-mono text-right px-1 py-0.5 rounded border outline-none" style={{ background: TV.bg, borderColor: TV.border, color: emaColor }} />
                 </div>
-                {/* HMA 2 */}
+                {/* EMA 2 */}
                 <div className="flex items-center gap-2">
                   <button onClick={() => onHma2VisibleChange(!isHma2Visible)} style={{ color: TV.textMuted }}>{isHma2Visible ? <EyeIcon /> : <EyeOffIcon />}</button>
-                  <span className="text-[11px] flex-1" style={{ color: TV.textSec }}>HMA 2</span>
+                  <span className="text-[11px] flex-1" style={{ color: TV.textSec }}>EMA 2</span>
                   <input type="color" value={hma2Color} onChange={(e) => onHma2ColorChange(e.target.value)} className="w-4 h-4 rounded cursor-pointer border-none p-0 bg-transparent" />
                   <input type="number" min="5" max="200" value={hma2Period} onChange={(e) => onHma2PeriodChange(parseInt(e.target.value) || 1)}
                     className="w-12 text-xs font-mono text-right px-1 py-0.5 rounded border outline-none" style={{ background: TV.bg, borderColor: TV.border, color: hma2Color }} />
                 </div>
-                {/* HMA */}
+                {/* EMA 3 */}
                 <div className="flex items-center gap-2">
                   <button onClick={() => onHmaVisibleChange(!isHmaVisible)} style={{ color: TV.textMuted }}>{isHmaVisible ? <EyeIcon /> : <EyeOffIcon />}</button>
-                  <span className="text-[11px] flex-1" style={{ color: TV.textSec }}>HMA</span>
+                  <span className="text-[11px] flex-1" style={{ color: TV.textSec }}>EMA 3</span>
                   <input type="color" value={hmaColor} onChange={(e) => onHmaColorChange(e.target.value)} className="w-4 h-4 rounded cursor-pointer border-none p-0 bg-transparent" />
                   <input type="number" min="5" max="300" value={hmaPeriod} onChange={(e) => onHmaPeriodChange(parseInt(e.target.value) || 1)}
                     className="w-12 text-xs font-mono text-right px-1 py-0.5 rounded border outline-none" style={{ background: TV.bg, borderColor: TV.border, color: hmaColor }} />
@@ -704,9 +681,6 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
         <div className="shrink-0 border-l flex flex-col" style={{ width: '220px', borderColor: TV.border, background: '#0a0a1a' }}>
           {/* MACD Dashboard */}
           {props.macdDashboard && <MacdDashboardPanel data={props.macdDashboard} />}
-
-          {/* Ultimate RSI */}
-          {props.rsiDashboard && <RsiDashboardPanel data={props.rsiDashboard} />}
 
           {/* Spacer */}
           <div className="flex-1" />

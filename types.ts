@@ -23,15 +23,19 @@ export interface MacdData {
 }
 
 export interface TradeSnapshot {
-  ema: number; // EMA 1
-  hma2: number; // HMA 2 (was EMA 2)
-  hma: number; // HMA 1 (Hull Suite)
+  ema1: number;
+  ema2: number;
+  ema3: number;
   macd: {
     macd: number;
     signal: number;
     histogram: number;
     trend: 'Positive Growing' | 'Positive Shrinking' | 'Negative Growing' | 'Negative Shrinking' | 'Neutral';
   };
+  macdDashboard?: MacdDashboardData;
+  rsiDashboard?: RsiDashboardData;
+  currentAtr?: number;
+  emaPeriods?: { ema1: number; ema2: number; ema3: number };
 }
 
 export interface Trade {
@@ -76,11 +80,17 @@ export interface RsiChartData {
 }
 
 export interface MacdDashboardData {
+  dailyBiasText: string;
+  dailyBiasColor: string;
   ema1hTrend: 'BULLISH' | 'BEARISH';
   macdVsZero: number;
   macdVsSignal: number;
   histogramRising: boolean;
   divergence: 'BULLISH' | 'BEARISH' | 'BULL + BEAR' | 'None';
+  rsi15: number;
+  rsiColor: string;
+  hist5Rising: boolean;
+  hist3Rising: boolean;
   atr: number;
   driftLabel: string;
   driftPct: number;
@@ -88,6 +98,7 @@ export interface MacdDashboardData {
   macdParams: { fast: number; slow: number; signal: number };
   ema1hParams: { fast: number; slow: number };
   atrPeriod: number;
+  rsiLen: number;
 }
 
 export interface MarketConfig {

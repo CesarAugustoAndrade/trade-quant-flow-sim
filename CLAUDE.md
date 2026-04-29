@@ -1,3 +1,7 @@
+# AI Model Instructions
+
+**When spawning Plan or research agents, always use `model: "opus"` (claude-opus-4-6). Use Sonnet (claude-sonnet-4-6) for implementation.**
+
 # QuantFlow Simulator
 
 High-fidelity market simulator with multiple stochastic engines and real-time technical analysis visualization.

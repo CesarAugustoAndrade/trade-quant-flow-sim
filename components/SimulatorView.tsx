@@ -494,34 +494,34 @@ export function SimulatorView(props: SimulatorViewProps) {
               <input type="range" min="5" max="200" step="5" value={emaPeriod} onChange={(e) => onEmaPeriodChange(parseInt(e.target.value))} className="w-full accent-yellow-500 bg-slate-700 h-1 rounded appearance-none cursor-pointer" style={{ accentColor: emaColor }} />
             </div>
 
-            {/* HMA 2 */}
+            {/* EMA 2 */}
             <div className="space-y-2 mb-4">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <button onClick={() => onHma2VisibleChange(!isHma2Visible)} className="text-slate-500 hover:text-white transition-colors">
                     {isHma2Visible ? <EyeIcon /> : <EyeOffIcon />}
                   </button>
-                  <label className="text-xs text-slate-500">HMA 2 Period</label>
+                  <label className="text-xs text-slate-500">EMA 2 Period</label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input type="color" value={hma2Color} onChange={(e) => onHma2ColorChange(e.target.value)} className="w-4 h-4 rounded cursor-pointer border-none p-0 bg-transparent" title="HMA 2 Color" />
+                  <input type="color" value={hma2Color} onChange={(e) => onHma2ColorChange(e.target.value)} className="w-4 h-4 rounded cursor-pointer border-none p-0 bg-transparent" title="EMA 2 Color" />
                   <input type="number" min="1" value={hma2Period} onChange={(e) => onHma2PeriodChange(parseInt(e.target.value) || 1)} className="bg-transparent text-right font-mono text-xs w-10 border-b border-transparent focus:border-indigo-500 focus:bg-slate-900/50 outline-none transition-all p-0" style={{ color: hma2Color }} />
                 </div>
               </div>
               <input type="range" min="5" max="200" step="5" value={hma2Period} onChange={(e) => onHma2PeriodChange(parseInt(e.target.value))} className="w-full accent-cyan-500 bg-slate-700 h-1 rounded appearance-none cursor-pointer" style={{ accentColor: hma2Color }} />
             </div>
 
-            {/* HMA */}
+            {/* EMA 3 */}
             <div className="space-y-2 mb-4">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
                   <button onClick={() => onHmaVisibleChange(!isHmaVisible)} className="text-slate-500 hover:text-white transition-colors">
                     {isHmaVisible ? <EyeIcon /> : <EyeOffIcon />}
                   </button>
-                  <label className="text-xs text-slate-500">HMA Period</label>
+                  <label className="text-xs text-slate-500">EMA 3 Period</label>
                 </div>
                 <div className="flex items-center gap-2">
-                  <input type="color" value={hmaColor} onChange={(e) => onHmaColorChange(e.target.value)} className="w-4 h-4 rounded cursor-pointer border-none p-0 bg-transparent" title="HMA Color" />
+                  <input type="color" value={hmaColor} onChange={(e) => onHmaColorChange(e.target.value)} className="w-4 h-4 rounded cursor-pointer border-none p-0 bg-transparent" title="EMA 3 Color" />
                   <input type="number" min="1" value={hmaPeriod} onChange={(e) => onHmaPeriodChange(parseInt(e.target.value) || 1)} className="bg-transparent text-right font-mono text-xs w-10 border-b border-transparent focus:border-indigo-500 focus:bg-slate-900/50 outline-none transition-all p-0" style={{ color: hmaColor }} />
                 </div>
               </div>

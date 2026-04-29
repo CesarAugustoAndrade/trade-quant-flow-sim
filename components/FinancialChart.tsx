@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { CandleData, MacdData, Trade } from '../types';
 
 interface FinancialChartProps {
@@ -76,6 +76,15 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
   const priceLinesRef = useRef<Map<number, any>>(new Map());
   // Trade SL/TP lines
   const tradeLinesRef = useRef<Map<string, any>>(new Map());
+
+  // Pencil drawing overlay
+  const pencilCanvasRef = useRef<HTMLCanvasElement>(null);
+  const pencilStrokesRef = useRef<Array<{ points: { x: number; y: number }[]; color: string }>>([]);
+  const isStrokingRef = useRef(false);
+  const strokeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const currentStrokeRef = useRef<{ x: number; y: number }[]>([]);
+  const [pencilColor] = useState('#f59e0b');
+  const [strokeCount, setStrokeCount] = useState(0);
 
   // Fix 2g-2: track last processed candle length for incremental updates
   const lastCandleLengthRef = useRef(0);
@@ -239,13 +248,118 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     };
   }, []);
 
-  // Drawing mode handler
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (isDrawingMode && candleSeriesRef.current && mainChartContainerRef.current) {
-      const rect = mainChartContainerRef.current.getBoundingClientRect();
-      const price = candleSeriesRef.current.coordinateToPrice(e.clientY - rect.top);
-      if (price !== null) onChartClick(price);
+  // Redraw all pencil strokes on the overlay canvas
+  const redrawPencilCanvas = useCallback(() => {
+    const canvas = pencilCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const stroke of pencilStrokesRef.current) {
+      if (stroke.points.length < 2) continue;
+      ctx.beginPath();
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+      for (let i = 1; i < stroke.points.length; i++) {
+        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+      }
+      ctx.stroke();
     }
+  }, []);
+
+  // Clear all pencil drawings
+  const clearPencilDrawings = useCallback(() => {
+    pencilStrokesRef.current = [];
+    setStrokeCount(0);
+    const canvas = pencilCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }, []);
+
+  // Resize pencil canvas to match chart container
+  useEffect(() => {
+    const container = mainChartContainerRef.current;
+    const canvas = pencilCanvasRef.current;
+    if (!container || !canvas) return;
+    const ro = new ResizeObserver(() => {
+      const rect = container.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      redrawPencilCanvas();
+    });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [redrawPencilCanvas]);
+
+  // Drawing mode handler — click places line, drag draws freehand
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (!isDrawingMode || !mainChartContainerRef.current) return;
+    const rect = mainChartContainerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    isStrokingRef.current = true;
+    strokeStartRef.current = { x, y };
+    currentStrokeRef.current = [{ x, y }];
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isStrokingRef.current || !isDrawingMode || !mainChartContainerRef.current) return;
+    const rect = mainChartContainerRef.current.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    currentStrokeRef.current.push({ x, y });
+    // Live draw on canvas
+    const canvas = pencilCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    const pts = currentStrokeRef.current;
+    if (pts.length < 2) return;
+    ctx.beginPath();
+    ctx.strokeStyle = pencilColor;
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.moveTo(pts[pts.length - 2].x, pts[pts.length - 2].y);
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const handleMouseUp = (e: React.MouseEvent) => {
+    if (!isStrokingRef.current || !isDrawingMode) { isStrokingRef.current = false; return; }
+    isStrokingRef.current = false;
+    const start = strokeStartRef.current;
+    if (!start || !mainChartContainerRef.current) return;
+    const rect = mainChartContainerRef.current.getBoundingClientRect();
+    const endX = e.clientX - rect.left;
+    const endY = e.clientY - rect.top;
+    const dist = Math.sqrt((endX - start.x) ** 2 + (endY - start.y) ** 2);
+    if (dist < 5) {
+      // Short click — place horizontal price line (existing behavior)
+      if (candleSeriesRef.current) {
+        const price = candleSeriesRef.current.coordinateToPrice(e.clientY - rect.top);
+        if (price !== null) onChartClick(price);
+      }
+    } else {
+      // Drag — save pencil stroke
+      pencilStrokesRef.current.push({ points: [...currentStrokeRef.current], color: pencilColor });
+      setStrokeCount(pencilStrokesRef.current.length);
+    }
+    currentStrokeRef.current = [];
+    strokeStartRef.current = null;
+  };
+
+  const handleMouseLeave = () => {
+    if (isStrokingRef.current && currentStrokeRef.current.length > 1) {
+      pencilStrokesRef.current.push({ points: [...currentStrokeRef.current], color: pencilColor });
+      setStrokeCount(pencilStrokesRef.current.length);
+    }
+    isStrokingRef.current = false;
+    currentStrokeRef.current = [];
+    strokeStartRef.current = null;
   };
 
   // Dynamic colors
@@ -275,10 +389,9 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     if (rsiSignalSeriesRef.current) rsiSignalSeriesRef.current.applyOptions({ visible: showRsi });
   }, [subChartMode]);
 
-  // Cursor / crosshair mode
+  // Crosshair mode for drawing
   useEffect(() => {
-    if (!mainChartRef.current || !mainChartContainerRef.current) return;
-    mainChartContainerRef.current.style.cursor = isDrawingMode ? 'crosshair' : 'default';
+    if (!mainChartRef.current) return;
     // @ts-ignore
     const mode = isDrawingMode ? window.LightweightCharts.CrosshairMode.Magnet : window.LightweightCharts.CrosshairMode.Normal;
     mainChartRef.current.applyOptions({ crosshair: { mode } });
@@ -421,14 +534,34 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     <div ref={chartContainerRef} className="flex flex-col w-full h-full bg-slate-800 rounded-xl shadow-2xl border border-slate-700 overflow-hidden select-none">
 
       {/* Pane 1: Price Chart */}
-      <div className="relative flex-1 border-b border-slate-700" onMouseDown={handleMouseDown}>
+      <div className="relative flex-1 border-b border-slate-700">
         <div ref={mainChartContainerRef} className="w-full h-full" />
+        {/* Pencil drawing overlay */}
+        <canvas
+          ref={pencilCanvasRef}
+          className="absolute inset-0 z-10"
+          style={{ pointerEvents: isDrawingMode ? 'auto' : 'none', cursor: isDrawingMode ? 'crosshair' : 'default' }}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
+        />
         <div className="absolute top-4 left-4 z-20 bg-slate-900/80 backdrop-blur px-3 py-1 rounded text-xs font-mono text-emerald-400 border border-emerald-900 pointer-events-none shadow-lg">
           LIVE: {currentPrice.toFixed(pricePrecision)}
         </div>
         {isDrawingMode && (
-          <div className="absolute top-4 right-4 z-20 bg-amber-500/20 border border-amber-500 text-amber-400 px-3 py-1 rounded text-xs font-bold animate-pulse pointer-events-none">
-            DRAWING MODE ACTIVE
+          <div className="absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-auto">
+            <div className="bg-amber-500/20 border border-amber-500 text-amber-400 px-3 py-1 rounded text-xs font-bold animate-pulse">
+              DRAW — click: line | drag: pencil
+            </div>
+            {strokeCount > 0 && (
+              <button
+                onClick={clearPencilDrawings}
+                className="bg-red-500/20 border border-red-500 text-red-400 px-2 py-1 rounded text-[10px] font-bold hover:bg-red-500/40 transition-colors"
+              >
+                CLEAR ({strokeCount})
+              </button>
+            )}
           </div>
         )}
       </div>
