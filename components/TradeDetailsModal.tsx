@@ -8,10 +8,11 @@ import { Trade, TradeType } from '../types';
 
 interface TradeDetailsModalProps {
   trade: Trade | null;
+  pricePrecision?: number;
   onClose: () => void;
 }
 
-export const TradeDetailsModal: React.FC<TradeDetailsModalProps> = ({ trade, onClose }) => {
+export const TradeDetailsModal: React.FC<TradeDetailsModalProps> = ({ trade, pricePrecision = 2, onClose }) => {
   if (!trade) return null;
 
   const isLong = trade.type === TradeType.LONG;
@@ -45,13 +46,13 @@ export const TradeDetailsModal: React.FC<TradeDetailsModalProps> = ({ trade, onC
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
               <span className="text-[10px] uppercase text-slate-500 tracking-wider block mb-1">Entry Price</span>
-              <span className="font-mono text-slate-200 text-lg">{trade.entryPrice.toFixed(2)}</span>
+              <span className="font-mono text-slate-200 text-lg">{trade.entryPrice.toFixed(pricePrecision)}</span>
             </div>
             <div className="bg-slate-800/50 p-3 rounded-lg border border-slate-700/50">
               <span className="text-[10px] uppercase text-slate-500 tracking-wider block mb-1">Result (PnL)</span>
               {isClosed ? (
                 <span className={`font-mono text-lg font-bold ${pnlColor}`}>
-                  ${trade.pnl?.toFixed(2)}
+                  ${trade.pnl?.toFixed(pricePrecision)}
                 </span>
               ) : (
                 <span className="text-amber-400 text-sm font-mono italic">TRADE OPEN</span>
@@ -70,17 +71,17 @@ export const TradeDetailsModal: React.FC<TradeDetailsModalProps> = ({ trade, onC
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between items-center p-2 rounded hover:bg-slate-800 transition-colors">
                   <span className="text-slate-400">EMA 1</span>
-                  <span className="font-mono text-yellow-400">{trade.snapshot.ema.toFixed(2)}</span>
+                  <span className="font-mono text-yellow-400">{trade.snapshot.ema1.toFixed(pricePrecision)}</span>
                 </div>
 
                 <div className="flex justify-between items-center p-2 rounded hover:bg-slate-800 transition-colors">
-                  <span className="text-slate-400">HMA 2</span>
-                  <span className="font-mono text-cyan-400">{trade.snapshot.hma2.toFixed(2)}</span>
+                  <span className="text-slate-400">EMA 2</span>
+                  <span className="font-mono text-cyan-400">{trade.snapshot.ema2.toFixed(pricePrecision)}</span>
                 </div>
 
                 <div className="flex justify-between items-center p-2 rounded hover:bg-slate-800 transition-colors">
-                  <span className="text-slate-400">HMA 1</span>
-                  <span className="font-mono text-violet-400">{trade.snapshot.hma.toFixed(2)}</span>
+                  <span className="text-slate-400">EMA 3</span>
+                  <span className="font-mono text-violet-400">{trade.snapshot.ema3.toFixed(pricePrecision)}</span>
                 </div>
                 
                 <div className="flex justify-between items-center p-2 rounded hover:bg-slate-800 transition-colors">

@@ -47,7 +47,7 @@ export class MarketEngine {
     const open = prevClose;
     const close = nextClose;
     const high = Math.max(open, close) + noise;
-    const low = Math.min(open, close) - (noise * 0.5); // asymmetric noise just for variety
+    const low = Math.max(0.00001, Math.min(open, close) - noise);
 
     this.currentPrice = close;
     this.currentTime += timeStepInSeconds;
