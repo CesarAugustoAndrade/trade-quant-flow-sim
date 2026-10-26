@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { SimulationType, MarketPreset } from '../types';
+import { SimulationType, MarketPreset, SimulatorViewName } from '../types';
 
 interface SimulationMenuProps {
-  onSelect: (simType: SimulationType, preset?: MarketPreset, v2?: boolean) => void;
+  onSelect: (simType: SimulationType, preset?: MarketPreset, view?: SimulatorViewName) => void;
 }
 
 const EURUSD_POINTS = [50,50.3,49.8,50.5,50.2,49.6,49.9,50.4,50.1,49.7,50.3,50.6,50.2,49.8,50.1,50.5,50.0,49.5,49.8,50.2];
+const DAX_POINTS = [50,50.4,49.9,50.2,53.5,52.1,55.8,56.9,55.2,54.6,55.1,54.3,57.9,60.8,59.1,62.4,61.7,63.2,62.5,62.9];
 const GBM_POINTS = [50,48,52,47,53,49,55,50,46,51,54,48,52,49,56,51,47,53,50,52];
 const MOMENTUM_POINTS = [50,51,53,56,54,57,60,62,65,63,66,69,72,70,73,76,74,77,80,78];
 const OU_POINTS = [50,54,58,62,60,56,52,50,48,52,56,60,57,53,50,52,56,59,55,51];
@@ -33,7 +34,7 @@ function Sparkline({ points, color, width = 160, height = 48 }: { points: number
 interface LegacyCard {
   type: SimulationType;
   preset?: MarketPreset;
-  v2?: boolean;
+  view?: SimulatorViewName;
   name: string;
   description: string;
   badge: string;
@@ -43,6 +44,17 @@ interface LegacyCard {
 }
 
 const legacyCards: LegacyCard[] = [
+  {
+    type: SimulationType.GBM,
+    preset: MarketPreset.EURUSD,
+    view: 'simulator-v2',
+    name: 'EUR/USD v2',
+    description: 'TradingView-inspired interface with MACD Dashboard, ATR-based risk management and drift scoring.',
+    badge: 'PRO',
+    accentHex: '#8b5cf6',
+    glowRgb: '139,92,246',
+    points: EURUSD_POINTS,
+  },
   {
     type: SimulationType.GBM,
     name: 'Classic GBM',
@@ -106,23 +118,23 @@ export function SimulationMenu({ onSelect }: SimulationMenuProps) {
         <p className="text-slate-500 text-sm tracking-wide">Select a market simulation model to begin your session</p>
       </div>
 
-      {/* Hero Card: EUR/USD v2 */}
+      {/* Hero Card: GER40 / DAX v3 */}
       <button
-        onClick={() => onSelect(SimulationType.GBM, MarketPreset.EURUSD, true)}
+        onClick={() => onSelect(SimulationType.DAX, MarketPreset.DAX, 'simulator-v3')}
         onMouseEnter={() => setIsHeroHovered(true)}
         onMouseLeave={() => setIsHeroHovered(false)}
         className="relative w-full max-w-3xl text-left bg-slate-900 border rounded-2xl p-8 overflow-hidden transition-all duration-300 cursor-pointer mb-8"
         style={{
           transform: isHeroHovered ? 'scale(1.01) translateY(-4px)' : 'scale(1) translateY(0)',
-          borderColor: isHeroHovered ? '#8b5cf699' : '#334155',
-          boxShadow: isHeroHovered ? '0 0 40px -5px rgba(139,92,246,0.35)' : undefined,
+          borderColor: isHeroHovered ? '#2962ff99' : '#334155',
+          boxShadow: isHeroHovered ? '0 0 40px -5px rgba(41,98,255,0.35)' : undefined,
         }}
       >
         {/* Glow */}
         <div
           className="absolute inset-0 pointer-events-none transition-opacity duration-300"
           style={{
-            background: 'radial-gradient(ellipse at top left, rgba(139,92,246,0.1) 0%, transparent 60%)',
+            background: 'radial-gradient(ellipse at top left, rgba(41,98,255,0.1) 0%, transparent 60%)',
             opacity: isHeroHovered ? 1 : 0,
           }}
         />
@@ -132,28 +144,29 @@ export function SimulationMenu({ onSelect }: SimulationMenuProps) {
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-3">
               <div className="p-2 rounded-lg bg-slate-800/80">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2962ff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
                   <line x1="8" y1="21" x2="16" y2="21" />
                   <line x1="12" y1="17" x2="12" y2="21" />
                 </svg>
               </div>
               <div>
-                <h2 className="text-white font-bold text-xl">EUR/USD v2</h2>
+                <h2 className="text-white font-bold text-xl">GER40 · DAX v3</h2>
                 <span
                   className="text-[10px] font-bold tracking-widest px-2 py-0.5 rounded-full border"
-                  style={{ color: '#8b5cf6', borderColor: '#8b5cf655', backgroundColor: '#8b5cf633' }}
+                  style={{ color: '#2962ff', borderColor: '#2962ff55', backgroundColor: '#2962ff33' }}
                 >
-                  PRO
+                  NEW
                 </span>
               </div>
             </div>
             <p className="text-slate-400 text-sm leading-relaxed mb-4">
-              Professional TradingView-inspired interface with MACD Dashboard, ATR-based risk management, real-time drift scoring, and full keyboard control.
+              Realistic DAX session model: Xetra open, 14:30 US data and NY open volatility, GARCH clustering and trend/range days.
+              Opens with 100 4h candles of history, a TradingView-style multi-pane chart (1m · 5m · 4h) with timeframe MACD plus an always-on 4h MACD, and your usual trading setup.
             </p>
             <div
               className="text-sm font-semibold transition-opacity duration-300"
-              style={{ color: '#8b5cf6', opacity: isHeroHovered ? 1 : 0.6 }}
+              style={{ color: '#2962ff', opacity: isHeroHovered ? 1 : 0.6 }}
             >
               Start trading →
             </div>
@@ -161,7 +174,7 @@ export function SimulationMenu({ onSelect }: SimulationMenuProps) {
 
           {/* Right: sparkline */}
           <div className="hidden md:block pt-2 transition-opacity duration-300" style={{ opacity: isHeroHovered ? 1 : 0.5 }}>
-            <Sparkline points={EURUSD_POINTS} color="#8b5cf6" width={200} height={60} />
+            <Sparkline points={DAX_POINTS} color="#2962ff" width={200} height={60} />
           </div>
         </div>
       </button>
@@ -183,7 +196,7 @@ export function SimulationMenu({ onSelect }: SimulationMenuProps) {
             return (
               <button
                 key={card.name}
-                onClick={() => onSelect(card.type, card.preset, card.v2)}
+                onClick={() => onSelect(card.type, card.preset, card.view)}
                 onMouseEnter={() => setHoveredLegacy(idx)}
                 onMouseLeave={() => setHoveredLegacy(null)}
                 className="relative text-left bg-slate-900/60 border border-slate-800/60 rounded-xl p-4 overflow-hidden transition-all duration-300 cursor-pointer"

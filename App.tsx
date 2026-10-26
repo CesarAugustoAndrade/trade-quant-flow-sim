@@ -3,12 +3,15 @@ import { MarketEngine } from './services/marketEngine';
 import { MomentumEngine } from './services/momentumEngine';
 import { OUEngine } from './services/ouEngine';
 import { GARCHEngine } from './services/garchEngine';
+import { DaxEngine, lastWeekdayAt, previousSessionClose } from './services/daxEngine';
 import { StreamingMACD, StreamingEMA, StreamingATR, StreamingUltimateRSI, getMacdColor } from './services/indicators';
 import { TimeframeAggregator, TimeframeChartData, ChartIndicatorSettings } from './services/timeframeAggregator';
 import { SimulationMenu } from './components/SimulationMenu';
 import { SimulatorView } from './components/SimulatorView';
 import { SimulatorViewV2 } from './components/SimulatorViewV2';
-import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, SimulationType, MarketPreset, MARKET_PRESETS, SessionStats, MacdDashboardData, RsiDashboardData, RsiChartData, Timeframe, TIMEFRAME_SECONDS } from './types';
+import { SimulatorViewV3 } from './components/SimulatorViewV3';
+import { SimulatorViewProps } from './components/SimulatorView';
+import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, SimulationType, MarketPreset, MARKET_PRESETS, SessionStats, MacdDashboardData, RsiDashboardData, RsiChartData, Timeframe, TIMEFRAME_SECONDS, SimulatorViewName, DaxParams, DEFAULT_DAX_PARAMS } from './types';
 import { tradeApi } from './services/tradeApi';
 
 const CANDLE_TIME_STEP = 60;
@@ -21,10 +24,17 @@ enum DayProfile {
   CHOPPY = 'CHOPPY'
 }
 
-const createHtfAggregators = (settings: ChartIndicatorSettings) => new Map(
+const MAX_POINTS = 2000; // cap of the 1m state arrays
+
+// V3 (DAX): bars each chart timeframe keeps, and the 4h history the session opens with
+const V3_MAX_BARS: Record<Timeframe, number> = { '1m': 1000, '5m': 200, '4h': 1000 };
+const V3_INITIAL_4H_BARS = 100;
+
+// V1/V2 only aggregate 5m/4h (their 1m chart comes from App state); V3 feeds every timeframe with its own caps
+const createChartFeed = (settings: ChartIndicatorSettings, maxBars?: Record<Timeframe, number>) => new Map(
   (Object.keys(TIMEFRAME_SECONDS) as Timeframe[])
-    .filter(tf => tf !== '1m')
-    .map(tf => [tf, new TimeframeAggregator(TIMEFRAME_SECONDS[tf], settings)] as const)
+    .filter(tf => maxBars || tf !== '1m')
+    .map(tf => [tf, new TimeframeAggregator(TIMEFRAME_SECONDS[tf], settings, maxBars?.[tf])] as const)
 );
 
 function computeMacdDashboard(params: {
@@ -173,7 +183,7 @@ function computeMacdDashboard(params: {
 
 export default function App() {
   // --- Navigation State ---
-  const [currentView, setCurrentView] = useState<'menu' | 'simulator' | 'simulator-v2'>('menu');
+  const [currentView, setCurrentView] = useState<'menu' | SimulatorViewName>('menu');
   const [selectedSim, setSelectedSim] = useState<SimulationType>(SimulationType.GBM);
   const [activePreset, setActivePreset] = useState<MarketPreset>(MarketPreset.GENERIC);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -214,16 +224,23 @@ export default function App() {
   });
   const [rsiChartData, setRsiChartData] = useState<RsiChartData[]>([]);
 
-  // --- Chart timeframe (5m / 4h are aggregated from the 1m stream) ---
+  // --- Chart timeframe (timeframes in the chart feed are aggregated from the 1m stream) ---
   const [timeframe, setTimeframe] = useState<Timeframe>('1m');
   const [htfChartData, setHtfChartData] = useState<TimeframeChartData | null>(null);
+  const [macd4hData, setMacd4hData] = useState<MacdData[]>([]); // V3 always shows the 4h MACD
   const [chartDataVersion, setChartDataVersion] = useState(0); // bumped when indicator series are rebuilt wholesale
   const timeframeRef = useRef<Timeframe>('1m');
-  const htfAggregatorsRef = useRef(new Map<Timeframe, TimeframeAggregator>());
+  const chartFeedRef = useRef(new Map<Timeframe, TimeframeAggregator>());
   // Only reads refs and setters, so it is safe to call from the simulation loop closure
-  const publishHtfChartData = (tf: Timeframe) => {
-    setHtfChartData(htfAggregatorsRef.current.get(tf)?.getChartData() ?? null);
+  const publishChartFeed = (tf: Timeframe) => {
+    const feed = chartFeedRef.current;
+    setHtfChartData(feed.get(tf)?.getChartData() ?? null);
+    setMacd4hData(feed.get('4h')?.getMacdData() ?? []);
   };
+
+  // --- DAX (V3) engine params ---
+  const [daxParams, setDaxParams] = useState<DaxParams>(DEFAULT_DAX_PARAMS);
+  const daxParamsRef = useRef(daxParams);
 
   // --- Trading State ---
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -260,6 +277,7 @@ export default function App() {
   const marketEngineRef = useRef<MarketEngine | null>(null);
   const momentumEngineRef = useRef<MomentumEngine | null>(null);
   const ouEngineRef = useRef<OUEngine | null>(null);
+  const daxEngineRef = useRef<DaxEngine | null>(null);
   const garchEngineRef = useRef<GARCHEngine | null>(null);
   const macdEngineRef = useRef<StreamingMACD | null>(null);
   const macd15EngineRef = useRef<StreamingMACD | null>(null); // 15-min MACD
@@ -343,17 +361,14 @@ export default function App() {
   useEffect(() => { momentumParamsRef.current = momentumParams; }, [momentumParams]);
   useEffect(() => { ouParamsRef.current = ouParams; }, [ouParams]);
   useEffect(() => { garchParamsRef.current = garchParams; }, [garchParams]);
+  useEffect(() => { daxParamsRef.current = daxParams; }, [daxParams]);
   useEffect(() => { isAtrEnabledRef.current = isAtrEnabled; }, [isAtrEnabled]);
   useEffect(() => { currentAtrRef.current = currentAtr; }, [currentAtr]);
 
-  // --- Indicator Recalculation Effect ---
-  useEffect(() => {
-    // Higher timeframes keep a longer history than the 1m arrays, so they replay their own bars
-    htfAggregatorsRef.current.forEach(agg => agg.setSettings({ emaPeriod, hma2Period, hmaPeriod, macd: macdSettings }));
-    publishHtfChartData(timeframeRef.current);
-    setChartDataVersion(v => v + 1);
-
-    const currentCandles = candlesRef.current;
+  // --- Indicator Recalculation ---
+  // Replays 1m candles through fresh indicator engines: on settings changes, and over the V3 history prefill.
+  // Accepts more than MAX_POINTS candles (warm-up); the state arrays keep only the newest MAX_POINTS.
+  const replayIndicators = (currentCandles: CandleData[]) => {
     if (currentCandles.length === 0) return;
 
     const newEmaEngine = new StreamingEMA(emaPeriod);
@@ -412,14 +427,14 @@ export default function App() {
     macd15EngineRef.current = new15MacdEngine;
     macd15CountRef.current = count15;
     last15MacdRef.current = last15;
-    macd15BarsRef.current = new15Bars;
+    macd15BarsRef.current = new15Bars.slice(-300);
     rsi15EngineRef.current = new15RsiEngine;
-    rsi15BarsRef.current = newRsi15Bars;
+    rsi15BarsRef.current = newRsi15Bars.slice(-300);
     rsi15ValRef.current = last15Rsi;
     atr15EngineRef.current = new15AtrEngine;
     atr15ValRef.current = last15Atr;
     mtfCandleBufferRef.current = buf15;
-    setMacd15Data(new15MacdData);
+    setMacd15Data(new15MacdData.slice(-MAX_POINTS));
 
     // Replay 5-min MACD
     const new5MacdEngine = new StreamingMACD(macdSettings.fast, macdSettings.slow, macdSettings.signal);
@@ -487,10 +502,10 @@ export default function App() {
     lastDailyMacdRef.current = lastDaily;
     prevDailyMacdRef.current = prevDaily;
 
-    setEmaData(newEmaData);
-    setHma2Data(newHma2Data);
-    setHmaData(newHmaData);
-    setMacdData(newMacdData);
+    setEmaData(newEmaData.slice(-MAX_POINTS));
+    setHma2Data(newHma2Data.slice(-MAX_POINTS));
+    setHmaData(newHmaData.slice(-MAX_POINTS));
+    setMacdData(newMacdData.slice(-MAX_POINTS));
     emaEngineRef.current = newEmaEngine;
     hma2EngineRef.current = newHma2Engine;
     hmaEngineRef.current = newHmaEngine;
@@ -518,7 +533,7 @@ export default function App() {
       zone: lastRsi.rsi > 80 ? 'OVERBOUGHT' : lastRsi.rsi < 20 ? 'OVERSOLD' : 'NEUTRAL',
       length: 14, signalLength: 14,
     });
-    setRsiChartData(newRsiChartData);
+    setRsiChartData(newRsiChartData.slice(-MAX_POINTS));
 
     // Replay 1H EMA
     const new1h35Engine = new StreamingEMA(35);
@@ -552,6 +567,14 @@ export default function App() {
       rsi15: last15Rsi,
       macdSettings, atrPeriod, rsiLen: 14,
     }));
+  };
+
+  useEffect(() => {
+    // Feed timeframes keep a longer history than the 1m arrays, so they replay their own bars
+    chartFeedRef.current.forEach(agg => agg.setSettings({ emaPeriod, hma2Period, hmaPeriod, macd: macdSettings }));
+    publishChartFeed(timeframeRef.current);
+    setChartDataVersion(v => v + 1);
+    replayIndicators(candlesRef.current);
   }, [emaPeriod, hma2Period, hmaPeriod, macdSettings, atrPeriod]);
 
   // --- Helpers ---
@@ -687,8 +710,10 @@ export default function App() {
     setPriceLines([]);
     setMacd15Data([]);
     setRsiChartData([]);
-    htfAggregatorsRef.current = createHtfAggregators({ emaPeriod, hma2Period, hmaPeriod, macd: macdSettings });
-    publishHtfChartData(timeframeRef.current);
+    chartFeedRef.current = createChartFeed({ emaPeriod, hma2Period, hmaPeriod, macd: macdSettings });
+    publishChartFeed(timeframeRef.current);
+    // A V3 prefill replaces the data with a window of the same length, so charts must not treat it as a tick
+    setChartDataVersion(v => v + 1);
     setIsPlaying(false);
     setCurrentSessionLabel('RESET');
     setCurrentGarchSigma(p.volatility);
@@ -696,6 +721,29 @@ export default function App() {
     if (simType === SimulationType.GBM) {
       setConfig(prev => ({ ...prev, volatility: p.volatility, drift: p.drift }));
     }
+    if (simType === SimulationType.DAX) prefillDaxHistory(startPrice);
+  };
+
+  // V3: generate a month of GER40 up to the latest weekday's 08:00 Berlin pre-market, so the session opens with
+  // 100 4h bars (and 200 5m / 1000 1m) on the chart and every indicator and the dashboard already warmed up
+  const prefillDaxHistory = (startPrice: number) => {
+    const liveStart = lastWeekdayAt(Math.floor(Date.now() / 1000), 8 * 60);
+    const engine = new DaxEngine(startPrice, liveStart - 30 * 86400, daxParamsRef.current);
+    const history: CandleData[] = [];
+    while (engine.nextCandleTime() < liveStart) history.push(engine.nextTick());
+
+    const feed = createChartFeed({ emaPeriod, hma2Period, hmaPeriod, macd: macdSettings }, V3_MAX_BARS);
+    history.forEach(c => feed.forEach(agg => agg.push(c)));
+    feed.get('4h')?.keepLast(V3_INITIAL_4H_BARS);
+    chartFeedRef.current = feed;
+    daxEngineRef.current = engine;
+
+    const recent = history.slice(-MAX_POINTS);
+    candlesRef.current = recent;
+    setCandles(recent);
+    replayIndicators(history);
+    publishChartFeed(timeframeRef.current);
+    setCurrentSessionLabel(engine.getSessionLabel());
   };
 
   // --- Snapshot Logic ---
@@ -772,6 +820,13 @@ export default function App() {
           newCandle = ouEngineRef.current.nextTick(p.meanLevel, p.reversionSpeed, p.volatility, CANDLE_TIME_STEP);
           if (currentSessionLabel !== 'MANUAL') setCurrentSessionLabel('MANUAL');
 
+        } else if (sim === SimulationType.DAX) {
+          if (!daxEngineRef.current) return;
+          daxEngineRef.current.setParams(daxParamsRef.current);
+          newCandle = daxEngineRef.current.nextTick();
+          const label = daxEngineRef.current.getSessionLabel();
+          if (label !== currentSessionLabel) setCurrentSessionLabel(label);
+
         } else { // GARCH
           if (!garchEngineRef.current) return;
           const p = garchParamsRef.current;
@@ -780,8 +835,8 @@ export default function App() {
           if (currentSessionLabel !== 'MANUAL') setCurrentSessionLabel('MANUAL');
         }
 
-        htfAggregatorsRef.current.forEach(agg => agg.push(newCandle));
-        if (timeframeRef.current !== '1m') publishHtfChartData(timeframeRef.current);
+        chartFeedRef.current.forEach(agg => agg.push(newCandle));
+        if (chartFeedRef.current.has(timeframeRef.current)) publishChartFeed(timeframeRef.current);
 
         // 15-min MTF MACD: proper OHLC aggregation over 15 1-min candles
         const candleOHLC = { open: newCandle.open, high: newCandle.high, low: newCandle.low, close: newCandle.close };
@@ -874,41 +929,41 @@ export default function App() {
           });
           setRsiChartData(prev => {
             const next = [...prev, { time: newCandle.time, rsi: rsiVal.rsi, signal: rsiVal.signal }];
-            if (next.length > 2000) next.shift();
+            if (next.length > MAX_POINTS) next.shift();
             return next;
           });
         }
 
         setCandles(prev => {
           const next = [...prev, newCandle];
-          if (next.length > 2000) next.shift();
+          if (next.length > MAX_POINTS) next.shift();
           return next;
         });
         setMacdData(prev => {
           const prevHist = prev.length > 0 ? prev[prev.length - 1].value : 0;
           const next = [...prev, { time: newCandle.time, value: newMacd.histogram, color: getMacdColor(newMacd.histogram, prevHist), signal: newMacd.signal, macd: newMacd.macd }];
-          if (next.length > 2000) next.shift();
+          if (next.length > MAX_POINTS) next.shift();
           return next;
         });
         setEmaData(prev => {
           const next = [...prev, { time: newCandle.time, value: newEmaVal }];
-          if (next.length > 2000) next.shift();
+          if (next.length > MAX_POINTS) next.shift();
           return next;
         });
         setHma2Data(prev => {
           const next = [...prev, { time: newCandle.time, value: newHma2Val }];
-          if (next.length > 2000) next.shift();
+          if (next.length > MAX_POINTS) next.shift();
           return next;
         });
         setHmaData(prev => {
           const next = [...prev, { time: newCandle.time, value: newHmaVal }];
-          if (next.length > 2000) next.shift();
+          if (next.length > MAX_POINTS) next.shift();
           return next;
         });
         setMacd15Data(prev => {
           const prevHist = prev.length > 0 ? prev[prev.length - 1].value : 0;
           const next = [...prev, { time: newCandle.time, value: current15Macd.histogram, color: getMacdColor(current15Macd.histogram, prevHist), signal: current15Macd.signal, macd: current15Macd.macd }];
-          if (next.length > 2000) next.shift();
+          if (next.length > MAX_POINTS) next.shift();
           // Compute dashboard with latest data
           setMacdDashboard(computeMacdDashboard({
             last15Macd: last15MacdRef.current,
@@ -996,7 +1051,7 @@ export default function App() {
     const handleKeyDown = (e: KeyboardEvent) => {
       const tagName = (e.target as HTMLElement).tagName;
       if (tagName === 'INPUT' || tagName === 'TEXTAREA') return;
-      if (currentView !== 'simulator' && currentView !== 'simulator-v2') return;
+      if (currentView === 'menu') return;
 
       const key = e.key.toLowerCase();
       if (key === ' ') { e.preventDefault(); setIsPlaying(prev => !prev); return; }
@@ -1079,18 +1134,18 @@ export default function App() {
   const handleTimeframeChange = (tf: Timeframe) => {
     timeframeRef.current = tf;
     setTimeframe(tf);
-    publishHtfChartData(tf);
+    publishChartFeed(tf);
   };
 
   // --- Navigation Handlers ---
-  const handleSelectSim = (simType: SimulationType, preset?: MarketPreset, v2?: boolean) => {
+  const handleSelectSim = (simType: SimulationType, preset?: MarketPreset, view: SimulatorViewName = 'simulator') => {
     const resolvedPreset = preset || MarketPreset.GENERIC;
     setIsTransitioning(true);
     setTimeout(() => {
       setSelectedSim(simType);
       selectedSimRef.current = simType;
       setActivePreset(resolvedPreset);
-      setCurrentView(v2 ? 'simulator-v2' : 'simulator');
+      setCurrentView(view);
       resetSimulation(simType, resolvedPreset);
       setIsTransitioning(false);
     }, 300);
@@ -1211,183 +1266,111 @@ export default function App() {
 
   const currentPrice = candles.length > 0 ? candles[candles.length - 1].close : config.startPrice;
   const currentTimeDisplay = candles.length > 0 ? getSpainTime(candles[candles.length - 1].time) : '--:--';
-  // Trading, SL/TP and the dashboard always run on 1m; only the chart follows the selected timeframe
-  const chartData: TimeframeChartData = timeframe !== '1m' && htfChartData
-    ? htfChartData
-    : { candles, emaData, hma2Data, hmaData, macdData, rsiChartData };
+  // Trading, SL/TP and the dashboard always run on 1m; only the chart follows the selected timeframe.
+  // htfChartData is set whenever the chart feed has the selected timeframe (always for V3, 5m/4h for V1/V2).
+  const chartData: TimeframeChartData = htfChartData ?? { candles, emaData, hma2Data, hmaData, macdData, rsiChartData };
+
+  const viewProps: SimulatorViewProps = {
+    candles: chartData.candles,
+    macdData: chartData.macdData,
+    emaData: chartData.emaData,
+    hma2Data: chartData.hma2Data,
+    hmaData: chartData.hmaData,
+    hmaBandData,
+    priceLines,
+    trades,
+    pnl,
+    selectedTrade,
+    config,
+    macdSettings,
+    emaPeriod,
+    hma2Period,
+    hmaPeriod,
+    emaColor,
+    hma2Color,
+    hmaColor,
+    isEma1Visible,
+    isHma2Visible,
+    isHmaVisible,
+    subChartMode,
+    slPoints,
+    tpPoints,
+    pipSize,
+    pipValue,
+    isPlaying,
+    isAutoMode,
+    isBlindMode,
+    isDrawingMode,
+    currentSessionLabel,
+    selectedSim,
+    momentumParams,
+    ouParams,
+    garchParams,
+    currentGarchSigma,
+    currentPrice,
+    currentTimeDisplay,
+    pricePrecision: MARKET_PRESETS[activePreset].pricePrecision,
+    onReturnToMenu: handleReturnToMenu,
+    onReset: () => resetSimulation(selectedSim, activePreset),
+    onTogglePlay: () => setIsPlaying(p => !p),
+    onToggleAutoMode: () => setIsAutoMode(p => !p),
+    onToggleBlindMode: () => setIsBlindMode(p => !p),
+    onToggleDrawingMode: () => setIsDrawingMode(p => !p),
+    onConfigChange: setConfig,
+    onMacdSettingsChange: setMacdSettings,
+    onEmaPeriodChange: setEmaPeriod,
+    onHma2PeriodChange: setHma2Period,
+    onHmaPeriodChange: setHmaPeriod,
+    onEmaColorChange: setEmaColor,
+    onHma2ColorChange: setHma2Color,
+    onHmaColorChange: setHmaColor,
+    onEma1VisibleChange: setIsEma1Visible,
+    onHma2VisibleChange: setIsHma2Visible,
+    onHmaVisibleChange: setIsHmaVisible,
+    onSubChartModeChange: setSubChartMode,
+    onSlPointsChange: setSlPoints,
+    onTpPointsChange: setTpPoints,
+    onPipValueChange: setPipValue,
+    onTrade: handleTrade,
+    onCloseTrade: closeTrade,
+    onSelectTrade: setSelectedTrade,
+    onChartClick: (price) => { setPriceLines(prev => [...prev, price]); setIsDrawingMode(false); },
+    onRemoveLine: (index) => setPriceLines(prev => prev.filter((_, i) => i !== index)),
+    onDownloadCSV: downloadCSV,
+    onMomentumParamsChange: setMomentumParams,
+    onOuParamsChange: setOuParams,
+    onGarchParamsChange: setGarchParams,
+    currentAtr,
+    atrPeriod,
+    isAtrEnabled,
+    onAtrPeriodChange: setAtrPeriod,
+    onAtrEnabledChange: setIsAtrEnabled,
+    sessionStats,
+    macdDashboard,
+    rsiDashboard,
+    rsiChartData: chartData.rsiChartData,
+    timeframe,
+    chartDataVersion,
+    onTimeframeChange: handleTimeframeChange,
+  };
 
   return (
     <div className={`transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
       {currentView === 'menu' ? (
         <SimulationMenu onSelect={handleSelectSim} />
+      ) : currentView === 'simulator-v3' ? (
+        <SimulatorViewV3
+          {...viewProps}
+          macd4hData={macd4hData}
+          simTime={candles.length > 0 ? candles[candles.length - 1].time : 0}
+          prevSessionClose={previousSessionClose(candles)}
+          daxParams={daxParams}
+          onDaxParamsChange={setDaxParams}
+        />
       ) : currentView === 'simulator-v2' ? (
-        <SimulatorViewV2
-          candles={chartData.candles}
-          macdData={chartData.macdData}
-          emaData={chartData.emaData}
-          hma2Data={chartData.hma2Data}
-          hmaData={chartData.hmaData}
-          hmaBandData={hmaBandData}
-          priceLines={priceLines}
-          trades={trades}
-          pnl={pnl}
-          selectedTrade={selectedTrade}
-          config={config}
-          macdSettings={macdSettings}
-          emaPeriod={emaPeriod}
-          hma2Period={hma2Period}
-          hmaPeriod={hmaPeriod}
-          emaColor={emaColor}
-          hma2Color={hma2Color}
-          hmaColor={hmaColor}
-          isEma1Visible={isEma1Visible}
-          isHma2Visible={isHma2Visible}
-          isHmaVisible={isHmaVisible}
-          subChartMode={subChartMode}
-          slPoints={slPoints}
-          tpPoints={tpPoints}
-          pipSize={pipSize}
-          pipValue={pipValue}
-          isPlaying={isPlaying}
-          isAutoMode={isAutoMode}
-          isBlindMode={isBlindMode}
-          isDrawingMode={isDrawingMode}
-          currentSessionLabel={currentSessionLabel}
-          selectedSim={selectedSim}
-          momentumParams={momentumParams}
-          ouParams={ouParams}
-          garchParams={garchParams}
-          currentGarchSigma={currentGarchSigma}
-          currentPrice={currentPrice}
-          currentTimeDisplay={currentTimeDisplay}
-          pricePrecision={MARKET_PRESETS[activePreset].pricePrecision}
-          onReturnToMenu={handleReturnToMenu}
-          onReset={() => resetSimulation(selectedSim, activePreset)}
-          onTogglePlay={() => setIsPlaying(p => !p)}
-          onToggleAutoMode={() => setIsAutoMode(p => !p)}
-          onToggleBlindMode={() => setIsBlindMode(p => !p)}
-          onToggleDrawingMode={() => setIsDrawingMode(p => !p)}
-          onConfigChange={setConfig}
-          onMacdSettingsChange={setMacdSettings}
-          onEmaPeriodChange={setEmaPeriod}
-          onHma2PeriodChange={setHma2Period}
-          onHmaPeriodChange={setHmaPeriod}
-          onEmaColorChange={setEmaColor}
-          onHma2ColorChange={setHma2Color}
-          onHmaColorChange={setHmaColor}
-          onEma1VisibleChange={setIsEma1Visible}
-          onHma2VisibleChange={setIsHma2Visible}
-          onHmaVisibleChange={setIsHmaVisible}
-          onSubChartModeChange={setSubChartMode}
-          onSlPointsChange={setSlPoints}
-          onTpPointsChange={setTpPoints}
-          onPipValueChange={setPipValue}
-          onTrade={handleTrade}
-          onCloseTrade={closeTrade}
-          onSelectTrade={setSelectedTrade}
-          onChartClick={(price) => { setPriceLines(prev => [...prev, price]); setIsDrawingMode(false); }}
-          onRemoveLine={(index) => setPriceLines(prev => prev.filter((_, i) => i !== index))}
-          onDownloadCSV={downloadCSV}
-          onMomentumParamsChange={setMomentumParams}
-          onOuParamsChange={setOuParams}
-          onGarchParamsChange={setGarchParams}
-          currentAtr={currentAtr}
-          atrPeriod={atrPeriod}
-          isAtrEnabled={isAtrEnabled}
-          onAtrPeriodChange={setAtrPeriod}
-          onAtrEnabledChange={setIsAtrEnabled}
-          sessionStats={sessionStats}
-          macdDashboard={macdDashboard}
-          rsiDashboard={rsiDashboard}
-          rsiChartData={chartData.rsiChartData}
-          timeframe={timeframe}
-          chartDataVersion={chartDataVersion}
-          onTimeframeChange={handleTimeframeChange}
-        />
+        <SimulatorViewV2 {...viewProps} />
       ) : (
-        <SimulatorView
-          candles={chartData.candles}
-          macdData={chartData.macdData}
-          emaData={chartData.emaData}
-          hma2Data={chartData.hma2Data}
-          hmaData={chartData.hmaData}
-          hmaBandData={hmaBandData}
-          priceLines={priceLines}
-          trades={trades}
-          pnl={pnl}
-          selectedTrade={selectedTrade}
-          config={config}
-          macdSettings={macdSettings}
-          emaPeriod={emaPeriod}
-          hma2Period={hma2Period}
-          hmaPeriod={hmaPeriod}
-          emaColor={emaColor}
-          hma2Color={hma2Color}
-          hmaColor={hmaColor}
-          isEma1Visible={isEma1Visible}
-          isHma2Visible={isHma2Visible}
-          isHmaVisible={isHmaVisible}
-          subChartMode={subChartMode}
-          slPoints={slPoints}
-          tpPoints={tpPoints}
-          pipSize={pipSize}
-          pipValue={pipValue}
-          isPlaying={isPlaying}
-          isAutoMode={isAutoMode}
-          isBlindMode={isBlindMode}
-          isDrawingMode={isDrawingMode}
-          currentSessionLabel={currentSessionLabel}
-          selectedSim={selectedSim}
-          momentumParams={momentumParams}
-          ouParams={ouParams}
-          garchParams={garchParams}
-          currentGarchSigma={currentGarchSigma}
-          currentPrice={currentPrice}
-          currentTimeDisplay={currentTimeDisplay}
-          pricePrecision={MARKET_PRESETS[activePreset].pricePrecision}
-          onReturnToMenu={handleReturnToMenu}
-          onReset={() => resetSimulation(selectedSim, activePreset)}
-          onTogglePlay={() => setIsPlaying(p => !p)}
-          onToggleAutoMode={() => setIsAutoMode(p => !p)}
-          onToggleBlindMode={() => setIsBlindMode(p => !p)}
-          onToggleDrawingMode={() => setIsDrawingMode(p => !p)}
-          onConfigChange={setConfig}
-          onMacdSettingsChange={setMacdSettings}
-          onEmaPeriodChange={setEmaPeriod}
-          onHma2PeriodChange={setHma2Period}
-          onHmaPeriodChange={setHmaPeriod}
-          onEmaColorChange={setEmaColor}
-          onHma2ColorChange={setHma2Color}
-          onHmaColorChange={setHmaColor}
-          onEma1VisibleChange={setIsEma1Visible}
-          onHma2VisibleChange={setIsHma2Visible}
-          onHmaVisibleChange={setIsHmaVisible}
-          onSubChartModeChange={setSubChartMode}
-          onSlPointsChange={setSlPoints}
-          onTpPointsChange={setTpPoints}
-          onPipValueChange={setPipValue}
-          onTrade={handleTrade}
-          onCloseTrade={closeTrade}
-          onSelectTrade={setSelectedTrade}
-          onChartClick={(price) => { setPriceLines(prev => [...prev, price]); setIsDrawingMode(false); }}
-          onRemoveLine={(index) => setPriceLines(prev => prev.filter((_, i) => i !== index))}
-          onDownloadCSV={downloadCSV}
-          onMomentumParamsChange={setMomentumParams}
-          onOuParamsChange={setOuParams}
-          onGarchParamsChange={setGarchParams}
-          currentAtr={currentAtr}
-          atrPeriod={atrPeriod}
-          isAtrEnabled={isAtrEnabled}
-          onAtrPeriodChange={setAtrPeriod}
-          onAtrEnabledChange={setIsAtrEnabled}
-          sessionStats={sessionStats}
-          macdDashboard={macdDashboard}
-          rsiDashboard={rsiDashboard}
-          rsiChartData={chartData.rsiChartData}
-          timeframe={timeframe}
-          chartDataVersion={chartDataVersion}
-          onTimeframeChange={handleTimeframeChange}
-        />
+        <SimulatorView {...viewProps} />
       )}
     </div>
   );

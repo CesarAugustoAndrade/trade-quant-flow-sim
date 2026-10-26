@@ -1,8 +1,6 @@
 import { CandleData, MacdData, RsiChartData } from '../types';
 import { StreamingEMA, StreamingMACD, StreamingUltimateRSI, getMacdColor } from './indicators';
 
-const MAX_BARS = 2000;
-
 export interface ChartIndicatorSettings {
   emaPeriod: number;
   hma2Period: number;
@@ -26,8 +24,11 @@ const emptyChartData = (): TimeframeChartData => ({
 // Aggregates the 1m candle stream into a higher timeframe and keeps the chart indicators for it.
 // The last bar is still forming: its indicator values are peeked, and the engines only advance
 // once a candle from the next bucket arrives and closes it.
+// Storage may run up to 2× maxBars before old bars are dropped in one splice, keeping push() O(1) amortized;
+// getChartData() always returns at most maxBars.
 export class TimeframeAggregator {
   private readonly seconds: number;
+  private readonly maxBars: number;
   private data: TimeframeChartData = emptyChartData();
   private ema!: StreamingEMA;
   private ema2!: StreamingEMA;
@@ -35,8 +36,9 @@ export class TimeframeAggregator {
   private macd!: StreamingMACD;
   private rsi!: StreamingUltimateRSI;
 
-  constructor(seconds: number, settings: ChartIndicatorSettings) {
+  constructor(seconds: number, settings: ChartIndicatorSettings, maxBars = 2000) {
     this.seconds = seconds;
+    this.maxBars = maxBars;
     this.setSettings(settings);
   }
 
@@ -52,17 +54,22 @@ export class TimeframeAggregator {
         high: Math.max(forming.high, candle.high),
         low: Math.min(forming.low, candle.low),
         close: candle.close,
+        volume: (forming.volume ?? 0) + (candle.volume ?? 0),
       };
       this.popIndicators();
     } else {
       if (forming) this.commit(forming.close);
-      candles.push({ time, open: candle.open, high: candle.high, low: candle.low, close: candle.close });
+      candles.push({ time, open: candle.open, high: candle.high, low: candle.low, close: candle.close, volume: candle.volume ?? 0 });
     }
     this.pushIndicators(candles[candles.length - 1]);
 
-    if (candles.length > MAX_BARS) {
-      Object.values(this.data).forEach(series => series.shift());
-    }
+    if (candles.length > this.maxBars * 2) this.keepLast(this.maxBars);
+  }
+
+  // Drops all but the newest n bars (indicator engines keep their state)
+  keepLast(n: number): void {
+    const excess = this.data.candles.length - n;
+    if (excess > 0) Object.values(this.data).forEach(series => series.splice(0, excess));
   }
 
   // Recreates the indicator engines and replays the stored bars through them
@@ -81,14 +88,19 @@ export class TimeframeAggregator {
   // Fresh array references, so React and the chart's memo comparator see a change
   getChartData(): TimeframeChartData {
     const d = this.data;
+    const from = -this.maxBars;
     return {
-      candles: [...d.candles],
-      emaData: [...d.emaData],
-      hma2Data: [...d.hma2Data],
-      hmaData: [...d.hmaData],
-      macdData: [...d.macdData],
-      rsiChartData: [...d.rsiChartData],
+      candles: d.candles.slice(from),
+      emaData: d.emaData.slice(from),
+      hma2Data: d.hma2Data.slice(from),
+      hmaData: d.hmaData.slice(from),
+      macdData: d.macdData.slice(from),
+      rsiChartData: d.rsiChartData.slice(from),
     };
+  }
+
+  getMacdData(): MacdData[] {
+    return this.data.macdData.slice(-this.maxBars);
   }
 
   private commit(close: number): void {

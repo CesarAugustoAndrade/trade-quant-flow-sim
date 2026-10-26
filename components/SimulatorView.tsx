@@ -19,6 +19,7 @@ const SIM_LABELS: Record<SimulationType, string> = {
   [SimulationType.MOMENTUM]: 'MOMENTUM',
   [SimulationType.OU]: 'MEAN REV',
   [SimulationType.GARCH]: 'GARCH',
+  [SimulationType.DAX]: 'DAX',
 };
 
 const SIM_MODEL_LABELS: Record<SimulationType, string> = {
@@ -26,6 +27,7 @@ const SIM_MODEL_LABELS: Record<SimulationType, string> = {
   [SimulationType.MOMENTUM]: 'Autocorrelation',
   [SimulationType.OU]: 'Ornstein-Uhlenbeck',
   [SimulationType.GARCH]: 'GARCH(1,1)',
+  [SimulationType.DAX]: 'GER40 Session Model',
 };
 
 export interface SimulatorViewProps {

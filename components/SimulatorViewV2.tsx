@@ -3,163 +3,19 @@ import { FinancialChart } from './FinancialChart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { TradeDetailsModal } from './TradeDetailsModal';
 import { SimulatorViewProps } from './SimulatorView';
-import { TradeType, SimulationType, MacdDashboardData } from '../types';
+import { TradeType, SimulationType } from '../types';
 import { ToastNotification, ToastMessage } from './ToastNotification';
-
-// --- TradingView Color Palette ---
-const TV = {
-  bg: '#131722',
-  panel: '#1e222d',
-  panelHover: '#2a2e39',
-  border: '#363a45',
-  text: '#d1d4dc',
-  textSec: '#787b86',
-  textMuted: '#4c525e',
-  green: '#089981',
-  red: '#f23645',
-  blue: '#2962ff',
-};
-
-// --- Compact SVG Icons ---
-const PlayIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21"/></svg>;
-const PauseIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>;
-const GearIcon = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>;
-const PencilIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>;
-const RefreshIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>;
-const MenuIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
-const ChevronDown = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"/></svg>;
-const ChevronUp = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="18 15 12 9 6 15"/></svg>;
-const XIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
-const DownloadIcon = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
-const ClipboardIcon = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>;
-const EyeIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>;
-const EyeOffIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>;
+import { TV, PlayIcon, PauseIcon, GearIcon, PencilIcon, RefreshIcon, MenuIcon, XIcon, EyeIcon, EyeOffIcon, TBtn, Section, Param } from './tv/ui';
+import { MacdDashboardPanel } from './tv/MacdDashboardPanel';
+import { TradesPanel } from './tv/TradesPanel';
 
 const SIM_MODEL_LABELS: Record<SimulationType, string> = {
   [SimulationType.GBM]: 'GBM Stochastic',
   [SimulationType.MOMENTUM]: 'Autocorrelation',
   [SimulationType.OU]: 'Ornstein-Uhlenbeck',
   [SimulationType.GARCH]: 'GARCH(1,1)',
+  [SimulationType.DAX]: 'GER40 Session Model',
 };
-
-// --- Toolbar Button ---
-function TBtn({ active, onClick, children, title, className = '' }: { active?: boolean; onClick?: () => void; children: React.ReactNode; title?: string; className?: string }) {
-  const [hovered, setHovered] = useState(false);
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      className={`px-2.5 py-1.5 text-xs rounded transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500/50 ${active ? 'text-[#2962ff]' : ''} ${className}`}
-      style={{
-        background: active ? '#2962ff33' : hovered ? TV.panelHover : 'transparent',
-        color: active ? '#2962ff' : hovered ? TV.text : TV.textSec,
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function DashRow({ label, children, lbl, row, txtL }: { label: string; children: React.ReactNode; lbl: string; row: string; txtL: string }) {
-  return (
-    <div className="flex items-center" style={{ borderBottom: '1px solid #ffffff08' }}>
-      <div className="flex-1 px-2 py-1 text-[9px] truncate" style={{ background: lbl, color: txtL }}>{label}</div>
-      <div className="px-2 py-1 text-right text-[10px]" style={{ background: row, minWidth: '80px' }}>{children}</div>
-    </div>
-  );
-}
-
-function MacdDashboardPanel({ data }: { data: MacdDashboardData }) {
-  const hdr = '#0f3460';
-  const lbl = '#1a1a2e';
-  const row = '#16213e';
-  const txtL = '#8899aa';
-  const g = '#00ff00';
-  const r = '#ff0000';
-  const rsiSuffix = data.rsi15 > 70 ? '  OB' : data.rsi15 < 30 ? '  OS' : '';
-  return (
-    <div className="flex flex-col text-[10px] font-mono" style={{ background: '#0a0a1a' }}>
-      {/* Header */}
-      <div className="px-2 py-1 text-center font-bold tracking-wider" style={{ background: hdr, color: '#fff', fontSize: '9px' }}>
-        MACD DASHBOARD <span style={{ color: '#8899aa', fontWeight: 'normal' }}>
-          (15m: {data.macdParams.fast}/{data.macdParams.slow}/{data.macdParams.signal})
-        </span>{' '}
-        <span style={{ color: '#00d2ff' }}>◉</span> CLOSED
-      </div>
-
-      {/* Row 1 — Daily Bias */}
-      <DashRow label="Daily Bias" lbl={lbl} row={row} txtL={txtL}>
-        <span className="font-bold" style={{ color: data.dailyBiasColor }}>{data.dailyBiasText}</span>
-      </DashRow>
-
-      {/* Row 2 — 1H EMA trend */}
-      <DashRow label={`1H EMA ${data.ema1hParams.fast} vs ${data.ema1hParams.slow}`} lbl={lbl} row={row} txtL={txtL}>
-        <span className="font-bold" style={{ color: data.ema1hTrend === 'BULLISH' ? g : r }}>{data.ema1hTrend}</span>
-      </DashRow>
-
-      {/* Row 3 — MACD vs Zero */}
-      <DashRow label="MACD vs Zero" lbl={lbl} row={row} txtL={txtL}>
-        <span style={{ color: data.macdVsZero >= 0 ? g : r }}>{data.macdVsZero.toFixed(5)}</span>
-      </DashRow>
-
-      {/* Row 4 — MACD vs Signal */}
-      <DashRow label="MACD vs Signal" lbl={lbl} row={row} txtL={txtL}>
-        <span style={{ color: data.macdVsSignal >= 0 ? g : r }}>{data.macdVsSignal.toFixed(5)}</span>
-      </DashRow>
-
-      {/* Row 5 — Histogram */}
-      <DashRow label="Histogram" lbl={lbl} row={row} txtL={txtL}>
-        <span className="font-bold" style={{ color: data.histogramRising ? g : r }}>
-          {data.histogramRising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}
-        </span>
-      </DashRow>
-
-      {/* Row 6 — RSI Divergence */}
-      <DashRow label="RSI Divergence (200 bars)" lbl={lbl} row={row} txtL={txtL}>
-        <span style={{ color: data.divergence === 'None' ? '#888' : data.divergence.includes('BULL') ? g : r }}>
-          {data.divergence}
-        </span>
-      </DashRow>
-
-      {/* Row 7 — RSI (15m) */}
-      <DashRow label={`RSI (${data.rsiLen}) — 15m`} lbl={lbl} row={row} txtL={txtL}>
-        <span style={{ color: data.rsiColor }}>{data.rsi15.toFixed(2)}{rsiSuffix}</span>
-      </DashRow>
-
-      {/* Row 8 — 5m Histogram */}
-      <DashRow label="Histogram — 5m" lbl={lbl} row={row} txtL={txtL}>
-        <span className="font-bold" style={{ color: data.hist5Rising ? g : r }}>
-          {data.hist5Rising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}
-        </span>
-      </DashRow>
-
-      {/* Row 9 — 3m Histogram */}
-      <DashRow label="Histogram — 3m" lbl={lbl} row={row} txtL={txtL}>
-        <span className="font-bold" style={{ color: data.hist3Rising ? g : r }}>
-          {data.hist3Rising ? '\u25b2 CRESCENT' : '\u25bc DECRESCENT'}
-        </span>
-      </DashRow>
-
-      {/* Row 10 — ATR */}
-      <DashRow label={`ATR (${data.atrPeriod}) — 1m`} lbl={lbl} row={row} txtL={txtL}>
-        <span style={{ color: '#00d2ff' }}>{data.atr.toFixed(5)}</span>
-      </DashRow>
-
-      {/* Separator */}
-      <div style={{ height: '2px', background: hdr }} />
-
-      {/* Drift Score */}
-      <div className="flex items-center justify-between px-2 py-2" style={{ background: hdr }}>
-        <span className="font-bold uppercase" style={{ color: '#fff', fontSize: '11px' }}>DRIFT</span>
-        <span className="font-bold" style={{ color: data.driftColor, fontSize: '11px' }}>
-          {data.driftLabel}  {data.driftPct.toFixed(1)}%
-        </span>
-      </div>
-    </div>
-  );
-}
 
 export function SimulatorViewV2(props: SimulatorViewProps) {
   const {
@@ -183,8 +39,6 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
 
   const isMacdVisible = subChartMode === 'macd';
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'positions' | 'orders' | 'history' | 'journal'>('positions');
-  const [isBottomCollapsed, setIsBottomCollapsed] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const toastIdRef = useRef(0);
@@ -219,9 +73,6 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
 
 
   const openTrades = trades.filter(t => t.status === 'OPEN');
-  const pendingTrades = trades.filter(t => t.status === 'PENDING');
-  const closedTrades = trades.filter(t => t.status === 'CLOSED');
-  const filteredTrades = activeTab === 'positions' ? openTrades : activeTab === 'orders' ? pendingTrades : activeTab === 'history' ? closedTrades : [];
   const garchAB = garchParams.alpha + garchParams.beta;
 
   return (
@@ -372,7 +223,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
               </div>
             );
           })()}
-          <div className={`flex-1 ${isBottomCollapsed ? '' : ''}`}>
+          <div className="flex-1">
             <ErrorBoundary>
               <FinancialChart
                 candles={candles}
@@ -771,153 +622,17 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
 
       <ToastNotification messages={toasts} onDismiss={dismissToast} />
 
-      {/* ========== BOTTOM PANEL ========== */}
-      <div className="shrink-0 border-t" style={{ borderColor: TV.border, background: TV.panel }}>
-        {/* Tabs header */}
-        <div className="flex items-center justify-between h-8 px-3 border-b" style={{ borderColor: TV.border }}>
-          <div className="flex items-center gap-0.5">
-            {([
-              ['positions', `Positions (${openTrades.length})`],
-              ['orders', `Orders (${pendingTrades.length})`],
-              ['history', `History (${closedTrades.length})`],
-              ['journal', 'Journal'],
-            ] as const).map(([tab, label]) => (
-              <button
-                key={tab}
-                onClick={() => { setActiveTab(tab); if (isBottomCollapsed) setIsBottomCollapsed(false); }}
-                className="px-3 py-1 text-[11px] font-medium rounded-t transition-colors"
-                style={{
-                  color: activeTab === tab ? TV.text : TV.textMuted,
-                  background: activeTab === tab ? TV.bg : 'transparent',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={onDownloadCSV} className="p-1 rounded hover:bg-white/5 transition-colors" style={{ color: TV.textMuted }} title="Download CSV">
-              <DownloadIcon />
-            </button>
-            <button onClick={() => setIsBottomCollapsed(!isBottomCollapsed)} className="p-1 rounded hover:bg-white/5 transition-colors" style={{ color: TV.textMuted }}>
-              {isBottomCollapsed ? <ChevronUp /> : <ChevronDown />}
-            </button>
-          </div>
-        </div>
-
-        {/* Journal tab */}
-        {!isBottomCollapsed && activeTab === 'journal' && (
-          <div className="p-3 grid grid-cols-3 gap-2">
-            {[
-              { label: 'Win Rate', value: `${(sessionStats.winRate * 100).toFixed(1)}%`, color: sessionStats.winRate >= 0.5 ? '#089981' : '#f23645' },
-              { label: 'Avg R:R', value: sessionStats.avgRR.toFixed(2), color: '#888' },
-              { label: 'Profit Factor', value: sessionStats.profitFactor.toFixed(2), color: sessionStats.profitFactor >= 1 ? '#089981' : '#f23645' },
-              { label: 'Largest Win', value: `$${sessionStats.largestWin.toFixed(2)}`, color: '#089981' },
-              { label: 'Largest Loss', value: `$${Math.abs(sessionStats.largestLoss).toFixed(2)}`, color: '#f23645' },
-              { label: 'Total Pips', value: sessionStats.totalPips.toFixed(1), color: sessionStats.totalPips >= 0 ? '#089981' : '#f23645' },
-              { label: 'Max Consec W', value: String(sessionStats.maxConsecWins), color: '#089981' },
-              { label: 'Max Consec L', value: String(sessionStats.maxConsecLosses), color: '#f23645' },
-              { label: 'Avg Duration', value: `${sessionStats.avgDurationMinutes.toFixed(1)}m`, color: '#888' },
-            ].map(({ label, value, color }) => (
-              <div key={label} className="rounded p-2 text-center" style={{ background: TV.panel }}>
-                <div className="text-[9px] uppercase tracking-wider mb-1" style={{ color: '#555' }}>{label}</div>
-                <div className="text-sm font-mono font-bold" style={{ color }}>{value}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Table */}
-        {!isBottomCollapsed && activeTab !== 'journal' && (
-          <div className="overflow-auto" style={{ maxHeight: '200px' }}>
-            <table className="w-full text-xs text-left">
-              <thead>
-                <tr className="text-[10px] uppercase font-mono" style={{ color: TV.textMuted }}>
-                  <th className="px-3 py-2 font-normal">Side</th>
-                  <th className="px-3 py-2 font-normal">Entry</th>
-                  <th className="px-3 py-2 font-normal">SL</th>
-                  <th className="px-3 py-2 font-normal">TP</th>
-                  <th className="px-3 py-2 font-normal text-right">PnL</th>
-                  {activeTab === 'history' && <th className="px-3 py-2 font-normal">Exit</th>}
-                  <th className="px-3 py-2 font-normal text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="font-mono">
-                {filteredTrades.map(trade => {
-                  const rawDiff = trade.type === TradeType.LONG ? currentPrice - trade.entryPrice : trade.entryPrice - currentPrice;
-                  const livePnl = trade.status === 'CLOSED' ? trade.pnl : trade.status === 'PENDING' ? 0 : (rawDiff / pipSize) * pipValue;
-                  return (
-                    <tr key={trade.id} className={`border-t hover:bg-white/10 transition-colors duration-150 group${trade.status === 'OPEN' ? ` border-l-2 ${trade.type === TradeType.LONG ? 'border-l-green-500' : 'border-l-red-500'}` : ''}`} style={{ borderColor: TV.border + '66' }}>
-                      <td className="px-3 py-2 font-bold" style={{ color: trade.type === TradeType.LONG ? TV.green : TV.red }}>
-                        {trade.type === TradeType.LONG ? 'LONG' : 'SHORT'}
-                      </td>
-                      <td className="px-3 py-2" style={{ color: TV.text }}>{trade.entryPrice.toFixed(pricePrecision)}</td>
-                      <td className="px-3 py-2" style={{ color: trade.stopLoss ? TV.red : TV.textMuted }}>
-                        {trade.stopLoss ? trade.stopLoss.toFixed(pricePrecision) : '-'}
-                      </td>
-                      <td className="px-3 py-2" style={{ color: trade.takeProfit ? TV.green : TV.textMuted }}>
-                        {trade.takeProfit ? trade.takeProfit.toFixed(pricePrecision) : '-'}
-                      </td>
-                      <td className="px-3 py-2 text-right font-bold" style={{ color: trade.status === 'PENDING' ? '#f59e0b' : livePnl! >= 0 ? TV.green : TV.red }}>
-                        {trade.status === 'PENDING' ? 'PENDING' : `$${livePnl!.toFixed(2)}`}
-                      </td>
-                      {activeTab === 'history' && (
-                        <td className="px-3 py-2">
-                          <span className="text-[10px] font-bold" style={{ color: trade.exitReason === 'TP' ? TV.green : trade.exitReason === 'SL' ? TV.red : TV.textSec }}>
-                            {trade.exitReason || '-'}
-                          </span>
-                        </td>
-                      )}
-                      <td className="px-3 py-2 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          <button onClick={() => onSelectTrade(trade)} className="p-1 rounded hover:bg-white/10 transition-colors" style={{ color: TV.textMuted }} title="Details">
-                            <ClipboardIcon />
-                          </button>
-                          {trade.status !== 'CLOSED' && (
-                            <button onClick={() => onCloseTrade(trade.id)} className="px-2 py-0.5 rounded text-[10px] font-bold hover:bg-white/10 transition-colors" style={{ color: TV.red }}>
-                              CLOSE
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {filteredTrades.length === 0 && (
-                  <tr>
-                    <td colSpan={activeTab === 'history' ? 7 : 6} className="py-6 text-center text-[11px]" style={{ color: TV.textMuted }}>
-                      {activeTab === 'positions' ? 'No open positions' : activeTab === 'orders' ? 'No pending orders' : activeTab === 'history' ? 'No trade history' : ''}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// --- Helper components ---
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="mb-4 pb-4 border-b" style={{ borderColor: TV.border }}>
-      <div className="text-[10px] font-bold uppercase tracking-wider mb-3" style={{ color: TV.textMuted }}>{title}</div>
-      {children}
-    </div>
-  );
-}
-
-function Param({ label, children, disabled, blind }: { label: string; children: React.ReactNode; disabled?: boolean; blind?: boolean }) {
-  return (
-    <div className={`space-y-1 ${disabled ? 'opacity-50' : ''}`}>
-      <div className="flex justify-between items-center">
-        <span className="text-[11px]" style={{ color: TV.textSec }}>{label}</span>
-        {blind && <span className="text-[11px]" style={{ color: TV.textMuted }}>****</span>}
-      </div>
-      {children}
+      <TradesPanel
+        trades={trades}
+        currentPrice={currentPrice}
+        pipSize={pipSize}
+        pipValue={pipValue}
+        pricePrecision={pricePrecision}
+        sessionStats={sessionStats}
+        onSelectTrade={onSelectTrade}
+        onCloseTrade={onCloseTrade}
+        onDownloadCSV={onDownloadCSV}
+      />
     </div>
   );
 }

@@ -12,6 +12,7 @@ export interface CandleData {
   high: number;
   low: number;
   close: number;
+  volume?: number; // tick volume, only produced by the DAX engine
 }
 
 export interface MacdData {
@@ -122,12 +123,29 @@ export enum SimulationType {
   MOMENTUM = 'MOMENTUM',
   OU = 'OU',
   GARCH = 'GARCH',
+  DAX = 'DAX',
 }
+
+export type SimulatorViewName = 'simulator' | 'simulator-v2' | 'simulator-v3';
 
 export enum MarketPreset {
   GENERIC = 'GENERIC',
   EURUSD = 'EURUSD',
+  DAX = 'DAX',
 }
+
+// Knobs of the DAX session model (services/daxEngine.ts)
+export interface DaxParams {
+  dailyVolPct: number;   // target daily volatility in % (real DAX ≈ 1.0–1.3)
+  trendiness: number;    // 0..1 — share and strength of trend days vs range days
+  newsIntensity: number; // 0..1 — size of the 14:30 US data and 15:30 US open spikes
+}
+
+export const DEFAULT_DAX_PARAMS: DaxParams = {
+  dailyVolPct: 1.1,
+  trendiness: 0.5,
+  newsIntensity: 0.5,
+};
 
 export interface MarketPresetConfig {
   preset: MarketPreset;
@@ -199,5 +217,28 @@ export const MARKET_PRESETS: Record<MarketPreset, MarketPresetConfig> = {
     pipSize: 0.0001,
     pipValue: 1,            // $1 per pip (micro lot)
     spread: 0.00010,
+  },
+  [MarketPreset.DAX]: {
+    preset: MarketPreset.DAX,
+    label: 'GER40 (DAX)',
+    startPrice: 24000,
+    volatility: 0.0004,
+    drift: 0,
+    slPoints: 30,           // 30 index points
+    tpPoints: 60,           // 2:1 R:R
+    ouMeanLevel: 24000,
+    ouReversionSpeed: 0.01,
+    ouVolatility: 8,
+    momentumVolatility: 0.0004,
+    momentumTrendStrength: 0.55,
+    momentumDrift: 0,
+    garchOmega: 0.00000002,
+    garchAlpha: 0.08,
+    garchBeta: 0.9,
+    garchDrift: 0,
+    pricePrecision: 1,
+    pipSize: 1,             // 1 index point
+    pipValue: 1,            // €1 per point (1 CFD contract)
+    spread: 1.0,
   },
 };
