@@ -1,4 +1,13 @@
 
+// Histogram bar color: strong when the histogram grows away from zero, faded when it shrinks
+export const getMacdColor = (current: number, previous: number) => {
+  if (current >= 0) {
+    return current >= previous ? '#26a69a' : '#b2dfdb';
+  } else {
+    return current < previous ? '#ef5350' : '#ffcdd2';
+  }
+};
+
 export class StreamingMACD {
   private fastPeriod: number;
   private slowPeriod: number;
@@ -46,6 +55,15 @@ export class StreamingMACD {
     };
   }
 
+  // Same result as next() but without advancing state — for a bar that is still forming
+  peek(closePrice: number): { macd: number; signal: number; histogram: number } {
+    const emaFast = this.updateEMA(closePrice, this.emaFast, this.fastPeriod);
+    const emaSlow = this.updateEMA(closePrice, this.emaSlow, this.slowPeriod);
+    const macdLine = emaFast - emaSlow;
+    const signal = this.updateEMA(macdLine, this.emaSignal, this.signalPeriod);
+    return { macd: macdLine, signal, histogram: macdLine - signal };
+  }
+
   reset() {
     this.emaFast = null;
     this.emaSlow = null;
@@ -73,12 +91,13 @@ export class StreamingEMA {
   }
 
   next(price: number): number {
-    if (this.currentEma === null) {
-      this.currentEma = price;
-    } else {
-      this.currentEma = price * this.k + this.currentEma * (1 - this.k);
-    }
+    this.currentEma = this.peek(price);
     return this.currentEma;
+  }
+
+  // Same result as next() but without advancing state — for a bar that is still forming
+  peek(price: number): number {
+    return this.currentEma === null ? price : price * this.k + this.currentEma * (1 - this.k);
   }
 
   reset() {
@@ -213,12 +232,12 @@ class StreamingRMA {
   }
 
   next(x: number): number {
-    if (this.value === null) {
-      this.value = x;
-    } else {
-      this.value = (x + this.value * (this.period - 1)) / this.period;
-    }
+    this.value = this.peek(x);
     return this.value;
+  }
+
+  peek(x: number): number {
+    return this.value === null ? x : (x + this.value * (this.period - 1)) / this.period;
   }
 
   reset() { this.value = null; }
@@ -247,18 +266,7 @@ export class StreamingUltimateRSI {
 
     const upper = Math.max(...this.buffer);
     const lower = Math.min(...this.buffer);
-    const r = upper - lower;
-
-    let diff: number;
-    if (this.prevSrc === null || this.prevUpper === null || this.prevLower === null) {
-      diff = 0;
-    } else if (upper > this.prevUpper) {
-      diff = r;
-    } else if (lower < this.prevLower) {
-      diff = -r;
-    } else {
-      diff = close - this.prevSrc;
-    }
+    const diff = this.diff(close, upper, lower);
 
     this.prevUpper = upper;
     this.prevLower = lower;
@@ -270,6 +278,24 @@ export class StreamingUltimateRSI {
     const signal = this.signalEma.next(arsi);
 
     return { rsi: arsi, signal };
+  }
+
+  // Same result as next() but without advancing state — for a bar that is still forming
+  peek(close: number): { rsi: number; signal: number } {
+    const window = [...this.buffer, close].slice(-this.length);
+    const diff = this.diff(close, Math.max(...window), Math.min(...window));
+
+    const num = this.numRma.peek(diff);
+    const den = this.denRma.peek(Math.abs(diff));
+    const arsi = den !== 0 ? (num / den) * 50 + 50 : 50;
+    return { rsi: arsi, signal: this.signalEma.peek(arsi) };
+  }
+
+  private diff(close: number, upper: number, lower: number): number {
+    if (this.prevSrc === null || this.prevUpper === null || this.prevLower === null) return 0;
+    if (upper > this.prevUpper) return upper - lower;
+    if (lower < this.prevLower) return -(upper - lower);
+    return close - this.prevSrc;
   }
 
   reset() {

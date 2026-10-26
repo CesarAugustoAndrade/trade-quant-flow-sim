@@ -3,11 +3,12 @@ import { MarketEngine } from './services/marketEngine';
 import { MomentumEngine } from './services/momentumEngine';
 import { OUEngine } from './services/ouEngine';
 import { GARCHEngine } from './services/garchEngine';
-import { StreamingMACD, StreamingEMA, StreamingATR, StreamingUltimateRSI } from './services/indicators';
+import { StreamingMACD, StreamingEMA, StreamingATR, StreamingUltimateRSI, getMacdColor } from './services/indicators';
+import { TimeframeAggregator, TimeframeChartData, ChartIndicatorSettings } from './services/timeframeAggregator';
 import { SimulationMenu } from './components/SimulationMenu';
 import { SimulatorView } from './components/SimulatorView';
 import { SimulatorViewV2 } from './components/SimulatorViewV2';
-import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, SimulationType, MarketPreset, MARKET_PRESETS, SessionStats, MacdDashboardData, RsiDashboardData, RsiChartData } from './types';
+import { CandleData, MacdData, Trade, TradeType, MarketConfig, TradeSnapshot, SimulationType, MarketPreset, MARKET_PRESETS, SessionStats, MacdDashboardData, RsiDashboardData, RsiChartData, Timeframe, TIMEFRAME_SECONDS } from './types';
 import { tradeApi } from './services/tradeApi';
 
 const CANDLE_TIME_STEP = 60;
@@ -20,13 +21,11 @@ enum DayProfile {
   CHOPPY = 'CHOPPY'
 }
 
-const getMacdColor = (current: number, previous: number) => {
-  if (current >= 0) {
-    return current >= previous ? '#26a69a' : '#b2dfdb';
-  } else {
-    return current < previous ? '#ef5350' : '#ffcdd2';
-  }
-};
+const createHtfAggregators = (settings: ChartIndicatorSettings) => new Map(
+  (Object.keys(TIMEFRAME_SECONDS) as Timeframe[])
+    .filter(tf => tf !== '1m')
+    .map(tf => [tf, new TimeframeAggregator(TIMEFRAME_SECONDS[tf], settings)] as const)
+);
 
 function computeMacdDashboard(params: {
   last15Macd: { macd: number; signal: number; histogram: number };
@@ -215,6 +214,17 @@ export default function App() {
   });
   const [rsiChartData, setRsiChartData] = useState<RsiChartData[]>([]);
 
+  // --- Chart timeframe (5m / 4h are aggregated from the 1m stream) ---
+  const [timeframe, setTimeframe] = useState<Timeframe>('1m');
+  const [htfChartData, setHtfChartData] = useState<TimeframeChartData | null>(null);
+  const [chartDataVersion, setChartDataVersion] = useState(0); // bumped when indicator series are rebuilt wholesale
+  const timeframeRef = useRef<Timeframe>('1m');
+  const htfAggregatorsRef = useRef(new Map<Timeframe, TimeframeAggregator>());
+  // Only reads refs and setters, so it is safe to call from the simulation loop closure
+  const publishHtfChartData = (tf: Timeframe) => {
+    setHtfChartData(htfAggregatorsRef.current.get(tf)?.getChartData() ?? null);
+  };
+
   // --- Trading State ---
   const [trades, setTrades] = useState<Trade[]>([]);
   const [selectedTrade, setSelectedTrade] = useState<Trade | null>(null);
@@ -338,6 +348,11 @@ export default function App() {
 
   // --- Indicator Recalculation Effect ---
   useEffect(() => {
+    // Higher timeframes keep a longer history than the 1m arrays, so they replay their own bars
+    htfAggregatorsRef.current.forEach(agg => agg.setSettings({ emaPeriod, hma2Period, hmaPeriod, macd: macdSettings }));
+    publishHtfChartData(timeframeRef.current);
+    setChartDataVersion(v => v + 1);
+
     const currentCandles = candlesRef.current;
     if (currentCandles.length === 0) return;
 
@@ -672,6 +687,8 @@ export default function App() {
     setPriceLines([]);
     setMacd15Data([]);
     setRsiChartData([]);
+    htfAggregatorsRef.current = createHtfAggregators({ emaPeriod, hma2Period, hmaPeriod, macd: macdSettings });
+    publishHtfChartData(timeframeRef.current);
     setIsPlaying(false);
     setCurrentSessionLabel('RESET');
     setCurrentGarchSigma(p.volatility);
@@ -762,6 +779,9 @@ export default function App() {
           setCurrentGarchSigma(garchEngineRef.current.getCurrentSigma());
           if (currentSessionLabel !== 'MANUAL') setCurrentSessionLabel('MANUAL');
         }
+
+        htfAggregatorsRef.current.forEach(agg => agg.push(newCandle));
+        if (timeframeRef.current !== '1m') publishHtfChartData(timeframeRef.current);
 
         // 15-min MTF MACD: proper OHLC aggregation over 15 1-min candles
         const candleOHLC = { open: newCandle.open, high: newCandle.high, low: newCandle.low, close: newCandle.close };
@@ -1055,6 +1075,13 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [currentView]);
 
+  // Timeframe and its data are set together so the chart never sees one without the other
+  const handleTimeframeChange = (tf: Timeframe) => {
+    timeframeRef.current = tf;
+    setTimeframe(tf);
+    publishHtfChartData(tf);
+  };
+
   // --- Navigation Handlers ---
   const handleSelectSim = (simType: SimulationType, preset?: MarketPreset, v2?: boolean) => {
     const resolvedPreset = preset || MarketPreset.GENERIC;
@@ -1184,6 +1211,10 @@ export default function App() {
 
   const currentPrice = candles.length > 0 ? candles[candles.length - 1].close : config.startPrice;
   const currentTimeDisplay = candles.length > 0 ? getSpainTime(candles[candles.length - 1].time) : '--:--';
+  // Trading, SL/TP and the dashboard always run on 1m; only the chart follows the selected timeframe
+  const chartData: TimeframeChartData = timeframe !== '1m' && htfChartData
+    ? htfChartData
+    : { candles, emaData, hma2Data, hmaData, macdData, rsiChartData };
 
   return (
     <div className={`transition-opacity duration-300 ${isTransitioning ? 'opacity-0' : 'opacity-100'}`}>
@@ -1191,12 +1222,11 @@ export default function App() {
         <SimulationMenu onSelect={handleSelectSim} />
       ) : currentView === 'simulator-v2' ? (
         <SimulatorViewV2
-          candles={candles}
-          macdData={macdData}
-
-          emaData={emaData}
-          hma2Data={hma2Data}
-          hmaData={hmaData}
+          candles={chartData.candles}
+          macdData={chartData.macdData}
+          emaData={chartData.emaData}
+          hma2Data={chartData.hma2Data}
+          hmaData={chartData.hmaData}
           hmaBandData={hmaBandData}
           priceLines={priceLines}
           trades={trades}
@@ -1269,16 +1299,18 @@ export default function App() {
           sessionStats={sessionStats}
           macdDashboard={macdDashboard}
           rsiDashboard={rsiDashboard}
-          rsiChartData={rsiChartData}
+          rsiChartData={chartData.rsiChartData}
+          timeframe={timeframe}
+          chartDataVersion={chartDataVersion}
+          onTimeframeChange={handleTimeframeChange}
         />
       ) : (
         <SimulatorView
-          candles={candles}
-          macdData={macdData}
-
-          emaData={emaData}
-          hma2Data={hma2Data}
-          hmaData={hmaData}
+          candles={chartData.candles}
+          macdData={chartData.macdData}
+          emaData={chartData.emaData}
+          hma2Data={chartData.hma2Data}
+          hmaData={chartData.hmaData}
           hmaBandData={hmaBandData}
           priceLines={priceLines}
           trades={trades}
@@ -1351,7 +1383,10 @@ export default function App() {
           sessionStats={sessionStats}
           macdDashboard={macdDashboard}
           rsiDashboard={rsiDashboard}
-          rsiChartData={rsiChartData}
+          rsiChartData={chartData.rsiChartData}
+          timeframe={timeframe}
+          chartDataVersion={chartDataVersion}
+          onTimeframeChange={handleTimeframeChange}
         />
       )}
     </div>

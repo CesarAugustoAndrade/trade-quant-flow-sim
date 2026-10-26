@@ -108,6 +108,15 @@ export interface MarketConfig {
   startPrice: number;
 }
 
+export type Timeframe = '1m' | '5m' | '4h';
+
+// Bar length in seconds. Engines always emit 1m candles; higher timeframes are aggregated from them.
+export const TIMEFRAME_SECONDS: Record<Timeframe, number> = {
+  '1m': 60,
+  '5m': 300,
+  '4h': 14400,
+};
+
 export enum SimulationType {
   GBM = 'GBM',
   MOMENTUM = 'MOMENTUM',

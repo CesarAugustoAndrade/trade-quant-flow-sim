@@ -2,7 +2,7 @@ import React from 'react';
 import { FinancialChart } from './FinancialChart';
 import { ErrorBoundary } from './ErrorBoundary';
 import { TradeDetailsModal } from './TradeDetailsModal';
-import { CandleData, MacdData, Trade, TradeType, MarketConfig, SimulationType, SessionStats, MacdDashboardData, RsiDashboardData, RsiChartData } from '../types';
+import { CandleData, MacdData, Trade, TradeType, MarketConfig, SimulationType, SessionStats, MacdDashboardData, RsiDashboardData, RsiChartData, Timeframe } from '../types';
 
 // Icons
 const PlayIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>;
@@ -120,6 +120,11 @@ export interface SimulatorViewProps {
   sessionStats: SessionStats;
   macdDashboard: MacdDashboardData;
   rsiDashboard: RsiDashboardData;
+
+  // Chart timeframe
+  timeframe: Timeframe;
+  chartDataVersion: number;
+  onTimeframeChange: (tf: Timeframe) => void;
 }
 
 export function SimulatorView(props: SimulatorViewProps) {
@@ -137,6 +142,7 @@ export function SimulatorView(props: SimulatorViewProps) {
     onSlPointsChange, onTpPointsChange, onPipValueChange,
     onTrade, onCloseTrade, onSelectTrade, onChartClick, onRemoveLine, onDownloadCSV,
     onMomentumParamsChange, onOuParamsChange, onGarchParamsChange,
+    timeframe, chartDataVersion, onTimeframeChange,
   } = props;
 
   const isMacdVisible = subChartMode === 'macd';
@@ -724,6 +730,9 @@ export function SimulatorView(props: SimulatorViewProps) {
               rsiChartData={rsiChartData}
               subChartMode={subChartMode}
               pricePrecision={pricePrecision}
+              timeframe={timeframe}
+              dataVersion={chartDataVersion}
+              onTimeframeChange={onTimeframeChange}
               onChartClick={onChartClick}
             />
           </ErrorBoundary>

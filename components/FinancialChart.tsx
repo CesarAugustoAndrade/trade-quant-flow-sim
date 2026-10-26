@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { CandleData, MacdData, Trade } from '../types';
+import { CandleData, MacdData, Trade, Timeframe, TIMEFRAME_SECONDS } from '../types';
 
 interface FinancialChartProps {
   candles: CandleData[];
@@ -22,6 +22,9 @@ interface FinancialChartProps {
   hma2Color?: string;
   hmaColor?: string;
   pricePrecision?: number;
+  timeframe: Timeframe;
+  dataVersion: number; // changes when the series are rebuilt wholesale, forcing a full setData
+  onTimeframeChange: (tf: Timeframe) => void;
   onChartClick: (price: number) => void;
 }
 
@@ -46,6 +49,9 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
   hma2Color = '#06b6d4',
   hmaColor = '#a855f7',
   pricePrecision = 2,
+  timeframe,
+  dataVersion,
+  onTimeframeChange,
   onChartClick,
 }) => {
   const chartContainerRef = useRef<HTMLDivElement>(null);
@@ -88,6 +94,8 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
 
   // Fix 2g-2: track last processed candle length for incremental updates
   const lastCandleLengthRef = useRef(0);
+  const lastTimeframeRef = useRef(timeframe);
+  const lastDataVersionRef = useRef(dataVersion);
 
   // Initialization
   useEffect(() => {
@@ -402,9 +410,10 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     if (!candleSeriesRef.current || !histogramSeriesRef.current) return;
 
     const lastLen = lastCandleLengthRef.current;
+    const timeframeChanged = timeframe !== lastTimeframeRef.current;
 
-    if (candles.length === 0 || candles.length < lastLen) {
-      // Reset or replay — full rebuild
+    if (candles.length === 0 || candles.length < lastLen || timeframeChanged || dataVersion !== lastDataVersionRef.current) {
+      // Reset, replay, timeframe switch or indicator rebuild — full rebuild
       candleSeriesRef.current.setData(candles);
       if (emaSeriesRef.current) emaSeriesRef.current.setData(emaData);
       if (hma2SeriesRef.current) hma2SeriesRef.current.setData(hma2Data);
@@ -416,11 +425,11 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
       if (macdLineSeriesRef.current) macdLineSeriesRef.current.setData(macdData.map(d => ({ time: d.time, value: d.macd })));
       if (signalLineSeriesRef.current) signalLineSeriesRef.current.setData(macdData.map(d => ({ time: d.time, value: d.signal })));
 
-      // RSI
-      if (rsiChartData.length > 0) {
-        if (rsiLineSeriesRef.current) rsiLineSeriesRef.current.setData(rsiChartData.map(d => ({ time: d.time, value: d.rsi })));
-        if (rsiSignalSeriesRef.current) rsiSignalSeriesRef.current.setData(rsiChartData.map(d => ({ time: d.time, value: d.signal })));
-      }
+      // RSI (always replaced: leftover points newer than the incoming data would make update() throw)
+      if (rsiLineSeriesRef.current) rsiLineSeriesRef.current.setData(rsiChartData.map(d => ({ time: d.time, value: d.rsi })));
+      if (rsiSignalSeriesRef.current) rsiSignalSeriesRef.current.setData(rsiChartData.map(d => ({ time: d.time, value: d.signal })));
+
+      if (timeframeChanged && mainChartRef.current) mainChartRef.current.timeScale().scrollToRealTime();
 
     } else {
       // New candle appended OR last candle ticked — use update() for all series
@@ -450,7 +459,9 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
     }
 
     lastCandleLengthRef.current = candles.length;
-  }, [candles, macdData, emaData, hma2Data, hmaData, hmaBandData, rsiChartData]);
+    lastTimeframeRef.current = timeframe;
+    lastDataVersionRef.current = dataVersion;
+  }, [candles, macdData, emaData, hma2Data, hmaData, hmaBandData, rsiChartData, timeframe, dataVersion]);
 
   // Price lines
   useEffect(() => {
@@ -546,8 +557,21 @@ const FinancialChartInner: React.FC<FinancialChartProps> = ({
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
         />
-        <div className="absolute top-4 left-4 z-20 bg-slate-900/80 backdrop-blur px-3 py-1 rounded text-xs font-mono text-emerald-400 border border-emerald-900 pointer-events-none shadow-lg">
-          LIVE: {currentPrice.toFixed(pricePrecision)}
+        <div className="absolute top-4 left-4 z-20 flex items-center gap-2 pointer-events-none">
+          <div className="bg-slate-900/80 backdrop-blur px-3 py-1 rounded text-xs font-mono text-emerald-400 border border-emerald-900 shadow-lg">
+            LIVE: {currentPrice.toFixed(pricePrecision)}
+          </div>
+          <div className="flex bg-slate-900/80 backdrop-blur rounded border border-slate-700 overflow-hidden text-xs font-mono shadow-lg pointer-events-auto">
+            {(Object.keys(TIMEFRAME_SECONDS) as Timeframe[]).map(tf => (
+              <button
+                key={tf}
+                onClick={() => onTimeframeChange(tf)}
+                className={`px-2 py-1 transition-colors ${tf === timeframe ? 'bg-indigo-500/30 text-indigo-300' : 'text-slate-400 hover:text-slate-200'}`}
+              >
+                {tf}
+              </button>
+            ))}
+          </div>
         </div>
         {isDrawingMode && (
           <div className="absolute top-4 right-4 z-20 flex items-center gap-2 pointer-events-auto">
@@ -605,6 +629,10 @@ export const FinancialChart = React.memo(FinancialChartInner, (prev, next) => {
   const prevLast = prev.candles[prev.candles.length - 1];
   const nextLast = next.candles[next.candles.length - 1];
   if (prevLast?.time !== nextLast?.time) return false;
+  // A forming higher-timeframe bar keeps its time while its OHLC changes
+  if (prevLast?.close !== nextLast?.close || prevLast?.high !== nextLast?.high || prevLast?.low !== nextLast?.low) return false;
+  if (prev.timeframe !== next.timeframe) return false;
+  if (prev.dataVersion !== next.dataVersion) return false;
   // Other prop comparisons
   if (prev.trades !== next.trades) return false;
   if (prev.priceLines !== next.priceLines) return false;

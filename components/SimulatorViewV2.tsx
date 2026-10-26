@@ -143,7 +143,7 @@ function MacdDashboardPanel({ data }: { data: MacdDashboardData }) {
       </DashRow>
 
       {/* Row 10 — ATR */}
-      <DashRow label={`ATR (${data.atrPeriod}) — Chart TF`} lbl={lbl} row={row} txtL={txtL}>
+      <DashRow label={`ATR (${data.atrPeriod}) — 1m`} lbl={lbl} row={row} txtL={txtL}>
         <span style={{ color: '#00d2ff' }}>{data.atr.toFixed(5)}</span>
       </DashRow>
 
@@ -178,6 +178,7 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
     onMomentumParamsChange, onOuParamsChange, onGarchParamsChange,
     currentAtr, atrPeriod, isAtrEnabled, onAtrPeriodChange, onAtrEnabledChange,
     sessionStats,
+    timeframe, chartDataVersion, onTimeframeChange,
   } = props;
 
   const isMacdVisible = subChartMode === 'macd';
@@ -394,6 +395,9 @@ export function SimulatorViewV2(props: SimulatorViewProps) {
                 rsiChartData={rsiChartData}
                 subChartMode={subChartMode}
                 pricePrecision={pricePrecision}
+                timeframe={timeframe}
+                dataVersion={chartDataVersion}
+                onTimeframeChange={onTimeframeChange}
                 onChartClick={onChartClick}
               />
             </ErrorBoundary>
